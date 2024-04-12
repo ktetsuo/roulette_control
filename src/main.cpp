@@ -1,53 +1,26 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include "Timer.h"
+#include "MaxMinHolder.h"
+#include "DigitalOut.h"
+#include "BootSelIn.h"
+#include "ChatteringFilteredDigitalInWatcher.h"
+#include "AS5600.h"
+#include "ValueChangeWatcher.h"
+#include "IntervalWatcher.h"
+#include "HeartBeatLED.h"
 
 static constexpr pin_size_t BRAKE_CW_PIN = 2;
 static constexpr pin_size_t BRAKE_CCW_PIN = 3;
-static constexpr pin_size_t BOARD_LED_PIN = LED_BUILTIN;
 
-class HeartBeatLED
-{
-  const pin_size_t _pin;
-  const unsigned long _intervalms;
-  unsigned long _lastms;
-  bool _on;
+static BootSelIn bootSelIn;
+static ChatteringFilteredDigitalInWatcher bootSelWatcher(bootSelIn, 50, false);
 
-public:
-  explicit HeartBeatLED(pin_size_t pin, unsigned long intervalms);
-  void setup();
-  void loop();
-};
+static AS5600 as5600(Wire);
+static ValueChangeWatcher<unsigned int> encoderChangeWatcher;
 
-HeartBeatLED::HeartBeatLED(pin_size_t pin, unsigned long intervalms)
-    : _pin(pin), _intervalms(intervalms), _lastms(0), _on(false)
-{
-}
-void HeartBeatLED::setup()
-{
-  pinMode(_pin, OUTPUT);
-  digitalWrite(_pin, LOW);
-  _lastms = millis();
-  _on = false;
-}
-void HeartBeatLED::loop()
-{
-  const unsigned long ms = millis();
-  if (ms - _lastms >= _intervalms)
-  {
-    _lastms = ms;
-    if (_on)
-    {
-      _on = false;
-      digitalWrite(_pin, LOW);
-    }
-    else
-    {
-      _on = true;
-      digitalWrite(_pin, HIGH);
-    }
-  }
-}
-
-static HeartBeatLED heartBeatLED(BOARD_LED_PIN, 1000);
+static DigitalOut boardLED(LED_BUILTIN);
+static HeartBeatLED heartBeatLED(boardLED, 1000);
 
 void setup()
 {
@@ -57,11 +30,33 @@ void setup()
   digitalWrite(BRAKE_CCW_PIN, LOW);
   heartBeatLED.setup();
   Serial.begin(115200);
+  Wire.setSDA(4);
+  Wire.setSCL(5);
+  Wire.begin();
+  Wire.setClock(1000000);
+  as5600.begin();
 }
 
 void loop()
 {
+  static IntervalWatcher intervalWatcher("loop", Serial);
+  intervalWatcher.update();
   heartBeatLED.loop();
+  bootSelWatcher.update();
+  if (bootSelWatcher.isRisingEdge())
+  {
+    Serial.println("BOOTSEL ON!");
+  }
+  else if (bootSelWatcher.isFallingEdge())
+  {
+    Serial.println("BOOTSEL OFF!");
+  }
+  encoderChangeWatcher.update(as5600.getRawAngle());
+  if(encoderChangeWatcher.isChanged()){
+    Serial.print("Angle: ");
+    Serial.println(encoderChangeWatcher.value());
+  }
+
   if (Serial.available() > 0)
   {
     const int c = Serial.read();
@@ -71,6 +66,7 @@ void loop()
       digitalWrite(BRAKE_CW_PIN, LOW);
       digitalWrite(BRAKE_CCW_PIN, LOW);
       Serial.println("CW: OFF, CCW:OFF");
+      intervalWatcher.reset();
       break;
     case '1':
       digitalWrite(BRAKE_CW_PIN, HIGH);
@@ -88,6 +84,11 @@ void loop()
       digitalWrite(BRAKE_CCW_PIN, LOW);
       Serial.println("CCW: OFF");
       break;
+    case 'r':
+    {
+      Serial.println(as5600.getRawAngle());
+    }
+    break;
     default:
       break;
     }
