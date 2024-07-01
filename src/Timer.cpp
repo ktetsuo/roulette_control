@@ -14,6 +14,16 @@ unsigned long MilliSecTimer::elapsedTime() const
   return millis() - _t0;
 }
 
+/// @brief タイマーはリセットし、前回からの経過時間を返す
+/// @return 経過時間
+unsigned long MilliSecTimer::lap()
+{
+  const unsigned long t = millis();
+  const unsigned long elapsed = t - _t0;
+  _t0 = t;
+  return elapsed;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 MilliSecTimeoutTimer::MilliSecTimeoutTimer(unsigned long timeout)
     : _timeout(timeout)
@@ -49,6 +59,28 @@ void MilliSecIntervalTimer::update()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+MilliSecLapTimer::MilliSecLapTimer()
+    : _lapTime(0)
+{
+}
+
+void MilliSecLapTimer::reset()
+{
+  _timer.reset();
+}
+
+unsigned long MilliSecLapTimer::lap()
+{
+  _lapTime = _timer.lap();
+  return _lapTime;
+}
+
+unsigned long MilliSecLapTimer::lapTime() const
+{
+  return _lapTime;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 MicroSecTimer::MicroSecTimer()
     : _t0(0)
 {
@@ -60,6 +92,16 @@ void MicroSecTimer::reset()
 unsigned long MicroSecTimer::elapsedTime() const
 {
   return micros() - _t0;
+}
+
+/// @brief タイマーはリセットし、前回からの経過時間を返す
+/// @return 経過時間
+unsigned long MicroSecTimer::lap()
+{
+  const unsigned long t = micros();
+  const unsigned long elapsed = t - _t0;
+  _t0 = t;
+  return elapsed;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -94,4 +136,26 @@ void MicroSecIntervalTimer::update()
       _handler(_param);
     }
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+MicroSecLapTimer::MicroSecLapTimer()
+    : _lapTime(0)
+{
+}
+
+void MicroSecLapTimer::reset()
+{
+  _timer.reset();
+}
+
+unsigned long MicroSecLapTimer::lap()
+{
+  _lapTime = _timer.lap();
+  return _lapTime;
+}
+
+unsigned long MicroSecLapTimer::lapTime() const
+{
+  return _lapTime;
 }

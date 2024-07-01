@@ -25,7 +25,3 @@ unsigned int AS5600::getRawAngle()
   rawAngle |= (uint16_t)_twoWire.read();
   return rawAngle;
 }
-constexpr unsigned int AS5600::maxRowAngle()
-{
-  return 4096;
-}
