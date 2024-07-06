@@ -21,9 +21,9 @@
 #include "RotationBuffer.h"
 #include "RouletteEncoder.h"
 
-static DigitalOut tb6612In1(6);
-static DigitalOut tb6612In2(7);
-static PWM tb6612Pwm(8, 1000, 20000);
+static DigitalOut tb6612In1(19);
+static DigitalOut tb6612In2(20);
+static PWM tb6612Pwm(21, 1000, 20000);
 static TB6612 tb6612(tb6612In1, tb6612In2, tb6612Pwm);
 
 static BootSelIn bootSelIn;
@@ -43,7 +43,7 @@ static RotationBuffer<int, 100> speedBuf;
 static repeating_timer motorControlTimer;
 
 // PWM=100のときの加速度
-static constexpr float accelPwm100 = -1.77f;
+static constexpr float accelPwm100 = 1.77f;
 // モーターフリーのときの自然加速度（減速度）の絶対値
 static constexpr float accelFreeAbs = 0.452f;
 // 速度がvのときの自然加速度（減速度）
@@ -294,7 +294,7 @@ bool motorControlHandler(repeating_timer *t)
   switch (state)
   {
   case State::STOP:
-    if (200 < fabs(speedAverage))
+    if (150 < fabs(speedAverage))
     {
       // 平均速度が一定以上になったら減速待ちに遷移
       state = State::WAIT_DECELERATION;
@@ -310,7 +310,7 @@ bool motorControlHandler(repeating_timer *t)
     }
     break;
   case State::WAIT_DECELERATION:
-    if (fabs(speedAverage) <= 150)
+    if (fabs(speedAverage) <= 100)
     {
       // 平均速度が一定以下になったら制御状態へ遷移
       isLogging = true;
@@ -342,7 +342,7 @@ bool motorControlHandler(repeating_timer *t)
         tb6612.drive(pwmValue);
       }
     }
-    if (fabs(speedShortAverage) <= 20)
+    if (fabs(speedShortAverage) <= 5)
     {
       tb6612.brake();
       // tb6612.drive(100);
