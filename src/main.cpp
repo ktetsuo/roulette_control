@@ -197,8 +197,20 @@ static void targetSetFunc(unsigned int target)
   g_target = std::clamp(target, 1U, 10U);
 }
 
+static void resetOrigin()
+{
+  const unsigned int rawPos = rouletteEncoder.rawPos();
+  rouletteEncoder.originPos(rawPos);
+  Serial.printf("resetOrigin: %u\n", rawPos);
+}
+
+static void printPos()
+{
+  Serial.printf("pos: %u\n", rouletteEncoder.pos());
+}
+
 static ValueCommand<int> pwmCommand("pwm", pwmGetFunc, pwmSetFunc);
-static SimpleCommand printCommand("p", printLog);
+static SimpleCommand printPosCommand("p", printPos);
 static SimpleCommand rebootCommand("r", reboot);
 static ValueCommand<unsigned int> originCommand("origin", originGetFunc, originSetFunc);
 static SimpleCommand startLogCommand("s", startLog);
@@ -206,11 +218,12 @@ static SimpleCommand endLogCommand("e", endLog);
 static ValueCommand<int> accelCommand("accel", accelGetFunc, accelSetFunc);
 static ValueCommand<int> measureCommand("measure", measureGetFunc, measureSetFunc);
 static ValueCommand<unsigned int> targetCommand("target", targetGetFunc, targetSetFunc);
+static SimpleCommand resetOriginCommand("ro", resetOrigin);
 
-static constexpr size_t CMD_NUM = 9;
+static constexpr size_t CMD_NUM = 10;
 static std::array<const IConsoleCommand *, CMD_NUM> consoleCommands = {
     &pwmCommand,
-    &printCommand,
+    &printPosCommand,
     &rebootCommand,
     &originCommand,
     &startLogCommand,
@@ -218,6 +231,7 @@ static std::array<const IConsoleCommand *, CMD_NUM> consoleCommands = {
     &accelCommand,
     &measureCommand,
     &targetCommand,
+    &resetOriginCommand,
 };
 
 static SerialConsole<CMD_NUM> serialConsole(Serial, consoleCommands);
@@ -342,7 +356,7 @@ bool motorControlHandler(repeating_timer *t)
         tb6612.drive(pwmValue);
       }
     }
-    if (fabs(speedShortAverage) <= 5)
+    if (fabs(speedShortAverage) <= 10)
     {
       tb6612.brake();
       // tb6612.drive(100);
