@@ -43,9 +43,9 @@ static RotationBuffer<int, 100> speedBuf;
 static repeating_timer motorControlTimer;
 
 // PWM=100のときの加速度
-static constexpr float accelPwm100 = 1.77f;
+static constexpr float accelPwm100 = 2.00f;
 // モーターフリーのときの自然加速度（減速度）の絶対値
-static constexpr float accelFreeAbs = 0.452f;
+static constexpr float accelFreeAbs = 0.4f;
 // 速度がvのときの自然加速度（減速度）
 static constexpr float accelFree(float v)
 {
@@ -308,7 +308,7 @@ bool motorControlHandler(repeating_timer *t)
   switch (state)
   {
   case State::STOP:
-    if (150 < fabs(speedAverage))
+    if (100 < fabs(speedAverage))
     {
       // 平均速度が一定以上になったら減速待ちに遷移
       state = State::WAIT_DECELERATION;
@@ -324,7 +324,7 @@ bool motorControlHandler(repeating_timer *t)
     }
     break;
   case State::WAIT_DECELERATION:
-    if (fabs(speedAverage) <= 100)
+    if (fabs(speedAverage) <= 75)
     {
       // 平均速度が一定以下になったら制御状態へ遷移
       isLogging = true;
