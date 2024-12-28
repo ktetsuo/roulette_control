@@ -434,6 +434,7 @@ void setup()
   {
     Serial.println("error: add_repeating_timer_ms");
   }
+  resetOrigin();
 }
 
 void loop()
@@ -451,6 +452,7 @@ void loop()
   else if (bootSelWatcher.isFallingEdge())
   {
     Serial.println("BOOTSEL OFF!");
+    resetOrigin();
     if (bootSelContinueTimer.isTimeout())
     {
       // 2秒以上押されていたら再起動
