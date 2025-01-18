@@ -452,7 +452,7 @@ void loop()
 {
   static IntervalWatcher intervalWatcher("loop", Serial);
   intervalWatcher.update();
-  // heartBeatLED.loop();
+  heartBeatLED.loop();
   static MilliSecTimeoutTimer bootSelContinueTimer(2000);
   bootSelWatcher.update();
   if (bootSelWatcher.isRisingEdge())
