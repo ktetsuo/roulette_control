@@ -20,6 +20,16 @@
 
 #include "RotationBuffer.h"
 #include "RouletteEncoder.h"
+#include <SerialBT.h>
+#include <MsgPacketizer.h>
+
+enum class MsgIndex : uint8_t
+{
+  TargetNumber = 0,
+  CurrentPos,
+  CurrentNumber,
+  ControlState,
+};
 
 static DigitalOut tb6612In1(19);
 static DigitalOut tb6612In2(20);
@@ -248,13 +258,19 @@ enum class State
 };
 static State state = State::STOP;
 
+static void OnRecievedTargetNumber(int number)
+{
+  Serial.print("TargetNumber: ");
+  Serial.println(number);
+  g_target = number;
+}
+
 /// @brief モーター制御関数（割り込みで定期的に呼ばれる）
 /// @param t タイマー構造体のポインタ
 /// @return 常にtrue（falseを返すと割り込みが停止してしまう）
 bool motorControlHandler(repeating_timer *t)
 {
   const unsigned long t0 = micros();
-  digitalWrite(LED_BUILTIN, HIGH);
   rouletteEncoder.update();
   // 平均速度を求める
   static constexpr size_t SPEED_BUF_SIZE = 25;
@@ -411,7 +427,6 @@ bool motorControlHandler(repeating_timer *t)
     };
     logBuf.add(logData);
   }
-  digitalWrite(LED_BUILTIN, LOW);
   return true;
 }
 
@@ -435,6 +450,8 @@ void setup()
     Serial.println("error: add_repeating_timer_ms");
   }
   resetOrigin();
+  SerialBT.begin();
+  MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), &OnRecievedTargetNumber);
 }
 
 void loop()
@@ -483,7 +500,7 @@ void loop()
     {
     case State::STOP:
       Serial.println("STOP");
-      printLog();
+      // printLog();
       clearLog();
       break;
     case State::WAIT_DECELERATION:
@@ -507,7 +524,7 @@ void loop()
     lastState = currentState;
   }
   static ValueChangeWatcher<unsigned int> numberWatcher;
-  // numberWatcher.update(number);
+  numberWatcher.update(number);
   static ValueChangeWatcher<long> totalPosWatcher;
   // totalPosWatcher.update(totalPos / 10);
   if (numberWatcher.isChanged() || totalPosWatcher.isChanged())
@@ -529,4 +546,18 @@ void loop()
     Serial.println(disableInterruptLapTimer.lapTime());
   }
   serialConsole.run();
+
+  static ValueChangeWatcher<unsigned int> posWatcher;
+  posWatcher.update(pos);
+  if (posWatcher.isChanged())
+  {
+    MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentPos), pos);
+  }
+  if (numberWatcher.isChanged())
+  {
+    Serial.print("Number: ");
+    Serial.println(number);
+    MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentNumber), number);
+  }
+  MsgPacketizer::update();
 }
