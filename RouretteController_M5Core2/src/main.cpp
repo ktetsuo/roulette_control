@@ -8,14 +8,7 @@
 #include "RouletteDisplay.h"
 #include "ConnectionState.h"
 #include "XSemaphore.h"
-
-enum class MsgIndex : uint8_t
-{
-  TargetNumber = 0,
-  CurrentPos,
-  CurrentNumber,
-  ControlState,
-};
+#include "../../Common/MsgIndex.h"
 
 BluetoothSerial SerialBT;
 // BTAddress rouretteAddress("28:CD:C1:0E:D4:3D");

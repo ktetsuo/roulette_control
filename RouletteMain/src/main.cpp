@@ -23,13 +23,7 @@
 #include <SerialBT.h>
 #include <MsgPacketizer.h>
 
-enum class MsgIndex : uint8_t
-{
-  TargetNumber = 0,
-  CurrentPos,
-  CurrentNumber,
-  ControlState,
-};
+#include "../../Common/MsgIndex.h"
 
 static DigitalOut tb6612In1(19);
 static DigitalOut tb6612In2(20);
