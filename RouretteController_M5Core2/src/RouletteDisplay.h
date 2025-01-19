@@ -17,8 +17,12 @@ public:
     void setCurrentNumber(int number);
     void setConnectionState(ConnectionState state);
 
+    void onTouched(int x, int y);
+
 private:
     void drawRoulette(int centerNumber, float angle);
+    void onTouchedCenterCircle();
+    void onTouchedNumber(int number);
 
 private:
     M5GFX &_display;
@@ -28,6 +32,13 @@ private:
     int _currentNumber = 1;                                           // 現在の数値
     int _currentPos = 0;                                              // 現在の角度位置
     ConnectionState _connectionState = ConnectionState::Disconnected; // 接続状態
+
+    enum class Mode
+    {
+        Display, // 表示モード
+        Setting, // 設定モード
+    };
+    Mode _mode = Mode::Display;
 };
 
 #endif // __ROULETTEDISPLAY_H__

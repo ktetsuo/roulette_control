@@ -23,6 +23,38 @@ static uint32_t numberColor(int number)
     return color_table[number - 1];
 }
 
+// 指定角度に入っているか調べる
+// angle1とangle2は必ず右回り（角度が増える方向）とする
+static bool isInsideAngle(float angle, float angle1, float angle2)
+{
+    // 角度を0-360度の範囲に調整
+    if (angle < 0)
+    {
+        angle += 360;
+    }
+    if (angle1 < 0)
+    {
+        angle1 += 360;
+    }
+    if (angle2 < 0)
+    {
+        angle2 += 360;
+    }
+
+    // angle1がangle2より大きい場合、angle2を360度加算して範囲を調整
+    if (angle1 > angle2)
+    {
+        angle2 += 360;
+    }
+    // angleがangle1より小さい場合、360度加算して範囲を調整
+    if (angle < angle1)
+    {
+        angle += 360;
+    }
+
+    return angle1 <= angle && angle <= angle2;
+}
+
 // コンストラクタ
 RouletteDisplay::RouletteDisplay(M5GFX &display)
     : _display(display), _circleSprite(&display), _numberSprite(&_circleSprite)
@@ -51,7 +83,19 @@ void RouletteDisplay::update()
     // 描画開始
     _display.startWrite();
     // ルーレット描画
-    drawRoulette(_currentNumber, _currentPos * 360. / 4096.);
+    switch (_mode)
+    {
+    case Mode::Display:
+        _circleSprite.fillSprite(TFT_BLACK);
+        drawRoulette(_currentNumber, _currentPos * 360. / 4096.);
+        break;
+    case Mode::Setting:
+        _circleSprite.fillSprite(TFT_DARKGRAY);
+        drawRoulette(_targetNumber, 0);
+        break;
+    default:
+        break;
+    }
     // LCDに転送
     _circleSprite.pushSprite(40, 0);
     // 接続状態
@@ -148,4 +192,86 @@ void RouletteDisplay::setCurrentPos(int pos)
 void RouletteDisplay::setCurrentNumber(int number)
 {
     _currentNumber = number;
+}
+
+// タッチされたときの処理
+void RouletteDisplay::onTouched(int x, int y)
+{
+    constexpr int centerX = 160;
+    constexpr int centerY = 120;
+    constexpr int inner_radius = 50;
+    constexpr int inner_radius2 = inner_radius * inner_radius; // 半径の2乗
+    constexpr int outer_radius = 120;
+    constexpr int outer_radius2 = outer_radius * outer_radius; // 半径の2乗
+    const int dx = x - centerX;
+    const int dy = y - centerY;
+    const int distance2 = dx * dx + dy * dy; // 中心からの距離の2乗
+    if (distance2 < inner_radius2)
+    {
+        // 中心の円をタッチされた
+        Serial.println("Touched: CenterCircle");
+        onTouchedCenterCircle();
+    }
+    else if (distance2 < outer_radius2)
+    {
+        // ルーレットの目のエリアがタッチされた
+        const float radian = atan2(dy, dx);
+        const float angle = degrees(radian);
+        Serial.print("Touched: NumberArea ");
+        Serial.println(angle);
+        constexpr float numberAngleTable[10] = {
+            -45. + 36 * 0, // 1
+            -45. + 36 * 1, // 2
+            -45. + 36 * 2, // 3
+            -45. + 36 * 3, // 4
+            -45. + 36 * 4, // 5
+            -45. + 36 * 5, // 6
+            -45. + 36 * 6, // 7
+            -45. + 36 * 7, // 8
+            -45. + 36 * 8, // 9
+            -45. + 36 * 9, // 10
+        };
+        for (int n = 1; n <= 10; n++)
+        {
+            const int i = n - 1;
+            if (isInsideAngle(angle, numberAngleTable[i], numberAngleTable[(i + 1) % 10]))
+            {
+                Serial.print("Number: ");
+                Serial.println(n);
+                onTouchedNumber(n);
+                break;
+            }
+        }
+    }
+}
+
+// 中心の円がタッチされたときの処理
+void RouletteDisplay::onTouchedCenterCircle()
+{
+    switch (_mode)
+    {
+    case Mode::Display:
+        _mode = Mode::Setting;
+        break;
+    case Mode::Setting:
+        _mode = Mode::Display;
+        break;
+    default:
+        break;
+    }
+}
+
+// 数字がタッチされたときの処理
+void RouletteDisplay::onTouchedNumber(int number)
+{
+    switch (_mode)
+    {
+    case Mode::Display:
+        break;
+    case Mode::Setting:
+        _targetNumber = number;
+        break;
+    default:
+        break;
+    }
 }

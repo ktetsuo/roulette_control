@@ -110,6 +110,42 @@ void loop()
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
   }
 
+  // タッチパネル
+  const uint8_t touchCount = M5.Touch.getCount();
+  static bool s_lastTouched = false;
+  const bool touched = touchCount > 0;
+  static lgfx::v1::touch_point_t s_lastTouchPoint;
+  if (touched)
+  {
+    // タッチ位置取得
+    const lgfx::v1::touch_point_t touchPoint = M5.Touch.getTouchPointRaw();
+    if (!s_lastTouched)
+    {
+      // タッチ開始
+      Serial.print("Touch Start! X: ");
+      Serial.print(touchPoint.x);
+      Serial.print(", Y: ");
+      Serial.println(touchPoint.y);
+      // ディスプレイに通知
+      s_display.onTouched(touchPoint.x, touchPoint.y);
+    }
+    // 最終タッチ位置更新
+    s_lastTouchPoint = touchPoint;
+  }
+  else
+  {
+    if (s_lastTouched)
+    {
+      // タッチ終了
+      Serial.print("Touch End! X: ");
+      Serial.print(s_lastTouchPoint.x);
+      Serial.print(", Y: ");
+      Serial.println(s_lastTouchPoint.y);
+    }
+  }
+  // 最終タッチ状態更新
+  s_lastTouched = touched;
+
   // 画面の更新
   s_display.update();
 }
