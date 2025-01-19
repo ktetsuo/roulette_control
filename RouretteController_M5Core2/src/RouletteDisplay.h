@@ -18,6 +18,9 @@ public:
     void setConnectionState(ConnectionState state);
 
 private:
+    void drawRoulette(int centerNumber, float angle);
+
+private:
     M5GFX &_display;
     M5Canvas _numberSprite;
     M5Canvas _circleSprite;

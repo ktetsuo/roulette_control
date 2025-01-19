@@ -48,64 +48,16 @@ void RouletteDisplay::init()
 // 表示更新
 void RouletteDisplay::update()
 {
-    int centerNumber = _currentNumber;
-    // 定数を事前に計算
-    const int centerX = 120 - 1; // 中心X座標
-    const int centerY = 120 - 1; // 中心Y座標
-    const int currentAngle = _currentPos * 360 / 4096;
     // 描画開始
     _display.startWrite();
-
-    // 外側の円
-    _circleSprite.setColor(TFT_WHITE);
-    _circleSprite.fillEllipse(centerX, centerY, 120 - 1, 120 - 1);
-    // 内側の円
-    _circleSprite.setColor(numberColor(centerNumber));
-    _circleSprite.fillEllipse(centerX, centerY, 50 - 1, 50 - 1);
-    // ルーレット部
-    for (int i = 1; i <= 10; i++)
-    {
-        // 背景の扇形
-        _circleSprite.fillArc(centerX, centerY, 120 - 1 - 5, 60 - 1, 360 + 360. / 10 * (i - 1) - 45 - currentAngle, 360 + 360. / 10 * i - 45 - currentAngle, numberColor(i));
-        // 各数字
-        _numberSprite.fillSprite(TFT_TRANSPARENT);
-        _numberSprite.setFont(&fonts::lgfxJapanGothic_40);
-        _numberSprite.setTextSize(1);
-        const int16_t x = (_numberSprite.width() - _numberSprite.textWidth(String(i))) / 2;
-        const int16_t y = (_numberSprite.height() - _numberSprite.fontHeight()) / 2;
-        _numberSprite.setTextColor(TFT_WHITE);
-        _numberSprite.setCursor(x, y);
-        _numberSprite.print(i);
-        _numberSprite.setPivot(32, 120);
-        //        _numberSprite.pushRotateZoomWithAA(centerX, centerY, 90 + 18 + 36 * (i - 1) - 45 - currentAngle, 1., 1., TFT_TRANSPARENT);
-        _numberSprite.pushRotateZoom(centerX, centerY, 90 + 18 + 36 * (i - 1) - 45 - currentAngle, 1., 1., TFT_TRANSPARENT);
-    }
-    // 中心の数値
-    _circleSprite.setFont(&fonts::lgfxJapanGothic_40);
-    _circleSprite.setTextSize(2);
-    int16_t x = (_circleSprite.width() - _circleSprite.textWidth(String(centerNumber))) / 2;
-    int16_t y = (_circleSprite.height() - _circleSprite.fontHeight()) / 2;
-    _circleSprite.setTextColor(TFT_BLACK); // 縁取りの色
-    _circleSprite.setCursor(x + 1, y + 1);
-    _circleSprite.print(centerNumber);
-    _circleSprite.setCursor(x + 1, y - 1);
-    _circleSprite.print(centerNumber);
-    _circleSprite.setCursor(x - 1, y + 1);
-    _circleSprite.print(centerNumber);
-    _circleSprite.setCursor(x - 1, y - 1);
-    _circleSprite.print(centerNumber);
-    _circleSprite.setTextColor(TFT_WHITE); // フォントの色
-    _circleSprite.setCursor(x, y);
-    _circleSprite.print(centerNumber);
-    // 矢印
-    _circleSprite.fillTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_WHITE);
-    _circleSprite.drawTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_DARKGRAY);
+    // ルーレット描画
+    drawRoulette(_currentNumber, _currentPos * 360. / 4096.);
     // LCDに転送
     _circleSprite.pushSprite(40, 0);
     // 接続状態
-    _display.setFont(&fonts::lgfxJapanGothic_16);
+    _display.setFont(&fonts::Font0);
     _display.setTextColor(TFT_WHITE, TFT_BLACK);
-    _display.setTextSize(1);
+    _display.setTextSize(2);
     _display.setCursor(0, 0);
     switch (_connectionState)
     {
@@ -121,6 +73,57 @@ void RouletteDisplay::update()
     }
     // 描画終了
     _display.endWrite();
+}
+
+// ルーレット描画
+void RouletteDisplay::drawRoulette(int centerNumber, float angle)
+{
+    // 定数を事前に計算
+    const int centerX = 120 - 1; // 中心X座標
+    const int centerY = 120 - 1; // 中心Y座標
+    // 外側の円
+    _circleSprite.setColor(TFT_WHITE);
+    _circleSprite.fillEllipse(centerX, centerY, 120 - 1, 120 - 1);
+    // 内側の円
+    _circleSprite.setColor(numberColor(centerNumber));
+    _circleSprite.fillEllipse(centerX, centerY, 50 - 1, 50 - 1);
+    // ルーレット部
+    for (int i = 1; i <= 10; i++)
+    {
+        // 背景の扇形
+        _circleSprite.fillArc(centerX, centerY, 120 - 1 - 5, 60 - 1, 360 + 360. / 10 * (i - 1) - 45 - angle, 360 + 360. / 10 * i - 45 - angle, numberColor(i));
+        // 各数字
+        _numberSprite.fillSprite(TFT_TRANSPARENT);
+        _numberSprite.setFont(&fonts::Font6);
+        _numberSprite.setTextSize(1);
+        const int16_t x = (_numberSprite.width() - _numberSprite.textWidth(String(i))) / 2;
+        const int16_t y = (_numberSprite.height() - _numberSprite.fontHeight()) / 2 + 5; // 5は調整値
+        _numberSprite.setTextColor(TFT_WHITE);
+        _numberSprite.setCursor(x, y);
+        _numberSprite.print(i);
+        _numberSprite.setPivot(32, 120);
+        _numberSprite.pushRotateZoom(centerX, centerY, 90 + 18 + 36 * (i - 1) - 45 - angle, 1., 1., TFT_TRANSPARENT);
+    }
+    // 中心の数値
+    _circleSprite.setFont(&fonts::Font6);
+    _circleSprite.setTextSize(2);
+    const int16_t x = (_circleSprite.width() - _circleSprite.textWidth(String(centerNumber))) / 2;
+    const int16_t y = (_circleSprite.height() - _circleSprite.fontHeight()) / 2 + 5; // 5は調整値
+    _circleSprite.setTextColor(TFT_BLACK);                                           // 縁取りの色
+    _circleSprite.setCursor(x + 1, y + 1);
+    _circleSprite.print(centerNumber);
+    _circleSprite.setCursor(x + 1, y - 1);
+    _circleSprite.print(centerNumber);
+    _circleSprite.setCursor(x - 1, y + 1);
+    _circleSprite.print(centerNumber);
+    _circleSprite.setCursor(x - 1, y - 1);
+    _circleSprite.print(centerNumber);
+    _circleSprite.setTextColor(TFT_WHITE); // フォントの色
+    _circleSprite.setCursor(x, y);
+    _circleSprite.print(centerNumber);
+    // 矢印
+    _circleSprite.fillTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_WHITE);
+    _circleSprite.drawTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_DARKGRAY);
 }
 
 // ターゲットの数値を設定
