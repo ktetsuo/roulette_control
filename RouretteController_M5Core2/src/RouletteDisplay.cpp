@@ -69,6 +69,10 @@ RouletteDisplay::~RouletteDisplay()
 // 初期化
 void RouletteDisplay::init()
 {
+    _lastToggleTime = millis();
+    _lastDisplayTime = millis();
+    _display.setBrightness(255);
+    _display.setRotation(0);
     _numberSprite.createSprite(64, 64);
     _numberSprite.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT); // 黒を透明に設定
     _numberSprite.setBaseColor(TFT_TRANSPARENT);
@@ -80,29 +84,31 @@ void RouletteDisplay::init()
 // 表示更新
 void RouletteDisplay::update()
 {
+    // 現在時刻を取得
+    const unsigned long ms = millis();
+    // スピードが一定以上のときは表示モードに切り替える
+    if (3 <= abs(_currentSpeed))
+    {
+        _mode = Mode::Display;
+        // 最後に表示モードに切り替えた時間を記録
+        _lastDisplayTime = ms;
+    }
+    else
+    {
+        // スピードが一定以下の時間が一定時間経過したら設定モードに切り替える
+        if ((_mode == Mode::Display) && (1000 < ms - _lastDisplayTime))
+        {
+            _mode = Mode::Setting;
+        }
+    }
+
     // 描画開始
     _display.startWrite();
-    // ルーレット描画
-    switch (_mode)
-    {
-    case Mode::Display:
-        _circleSprite.fillSprite(TFT_BLACK);
-        drawRoulette(_currentNumber, _currentPos * 360. / 4096.);
-        break;
-    case Mode::Setting:
-        _circleSprite.fillSprite(TFT_DARKGRAY);
-        drawRoulette(_targetNumber, 0);
-        break;
-    default:
-        break;
-    }
-    // LCDに転送
-    _circleSprite.pushSprite(40, 0);
     // 接続状態
     _display.setFont(&fonts::Font0);
     _display.setTextColor(TFT_WHITE, TFT_BLACK);
-    _display.setTextSize(2);
-    _display.setCursor(0, 0);
+    _display.setTextSize(1);
+    _display.setCursor(226, 312 - 1);
     switch (_connectionState)
     {
     case ConnectionState::Disconnected:
@@ -115,12 +121,54 @@ void RouletteDisplay::update()
         _display.print("OK");
         break;
     }
+    // ルーレット描画
+    _circleSprite.fillSprite(TFT_BLACK);
+    switch (_mode)
+    {
+    case Mode::Display:
+        drawRoulette(_currentNumber, _currentPos * 360. / 4096., true);
+        break;
+    case Mode::Setting:
+        drawRoulette(_targetNumber, 0, false);
+        break;
+    default:
+        break;
+    }
+    // LCDに転送
+    _circleSprite.pushSprite(0, 40);
+    // 状態表示
+    if (1000 <= ms - _lastToggleTime)
+    {
+        _lastToggleTime = ms;
+        _toggleOn = !_toggleOn;
+    }
+    switch (_mode)
+    {
+    case Mode::Setting:
+        if (_toggleOn)
+        {
+            _display.setFont(&fonts::Font4);
+            _display.setCursor(16, 7);
+            _display.setTextColor(TFT_WHITE, TFT_BLACK);
+            _display.setTextSize(1);
+            _display.print("SELECT NUMBER");
+        }
+        else
+        {
+            _display.fillRect(0, 0, 240, 40, TFT_BLACK);
+        }
+        break;
+    case Mode::Display:
+    default:
+        _display.fillRect(0, 0, 240, 40, TFT_BLACK);
+        break;
+    }
     // 描画終了
     _display.endWrite();
 }
 
 // ルーレット描画
-void RouletteDisplay::drawRoulette(int centerNumber, float angle)
+void RouletteDisplay::drawRoulette(int centerNumber, float angle, bool drawNeedle)
 {
     // 定数を事前に計算
     const int centerX = 120 - 1; // 中心X座標
@@ -166,8 +214,11 @@ void RouletteDisplay::drawRoulette(int centerNumber, float angle)
     _circleSprite.setCursor(x, y);
     _circleSprite.print(centerNumber);
     // 矢印
-    _circleSprite.fillTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_WHITE);
-    _circleSprite.drawTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_DARKGRAY);
+    if (drawNeedle)
+    {
+        _circleSprite.fillTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_WHITE);
+        _circleSprite.drawTriangle(240 - 10, 0, 240, 10, 240 - 60, 60, TFT_DARKGRAY);
+    }
 }
 
 // ターゲットの数値を設定
@@ -188,6 +239,12 @@ void RouletteDisplay::setCurrentPos(int pos)
     _currentPos = pos;
 }
 
+// 現在スピードを設定
+void RouletteDisplay::setCurrentSpeed(int speed)
+{
+    _currentSpeed = speed;
+}
+
 // 現在ナンバーを設定
 void RouletteDisplay::setCurrentNumber(int number)
 {
@@ -195,10 +252,11 @@ void RouletteDisplay::setCurrentNumber(int number)
 }
 
 // タッチされたときの処理
-void RouletteDisplay::onTouched(int x, int y)
+Event RouletteDisplay::onTouched(int x, int y)
 {
-    constexpr int centerX = 160;
-    constexpr int centerY = 120;
+    Event ev = EvNone{};
+    constexpr int centerX = 120;
+    constexpr int centerY = 160;
     constexpr int inner_radius = 50;
     constexpr int inner_radius2 = inner_radius * inner_radius; // 半径の2乗
     constexpr int outer_radius = 120;
@@ -210,7 +268,7 @@ void RouletteDisplay::onTouched(int x, int y)
     {
         // 中心の円をタッチされた
         Serial.println("Touched: CenterCircle");
-        onTouchedCenterCircle();
+        ev = onTouchedCenterCircle();
     }
     else if (distance2 < outer_radius2)
     {
@@ -238,15 +296,16 @@ void RouletteDisplay::onTouched(int x, int y)
             {
                 Serial.print("Number: ");
                 Serial.println(n);
-                onTouchedNumber(n);
+                ev = onTouchedNumber(n);
                 break;
             }
         }
     }
+    return ev;
 }
 
 // 中心の円がタッチされたときの処理
-void RouletteDisplay::onTouchedCenterCircle()
+Event RouletteDisplay::onTouchedCenterCircle()
 {
     switch (_mode)
     {
@@ -259,19 +318,23 @@ void RouletteDisplay::onTouchedCenterCircle()
     default:
         break;
     }
+    return EvNone{}; // イベントなし
 }
 
 // 数字がタッチされたときの処理
-void RouletteDisplay::onTouchedNumber(int number)
+Event RouletteDisplay::onTouchedNumber(int number)
 {
+    Event ev = EvNone{};
     switch (_mode)
     {
     case Mode::Display:
         break;
     case Mode::Setting:
         _targetNumber = number;
+        ev = EvChangeTargetNumber{number};
         break;
     default:
         break;
     }
+    return ev;
 }

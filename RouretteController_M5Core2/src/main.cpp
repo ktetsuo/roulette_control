@@ -8,6 +8,7 @@
 #include "RouletteDisplay.h"
 #include "ConnectionState.h"
 #include "XSemaphore.h"
+#include "Note.h"
 #include "../../Common/MsgIndex.h"
 
 BluetoothSerial SerialBT;
@@ -40,6 +41,20 @@ static void connectAsyncTask(void *parameter)
   }
 }
 
+struct point_t
+{
+  int x;
+  int y;
+};
+
+// タッチパネルのタッチ位置を取得
+static point_t getTouchPoint()
+{
+  lgfx::v1::touch_point_t touchPoint = M5.Touch.getTouchPointRaw();
+  // 画面の向きに合わせる
+  return point_t{240 - touchPoint.y, touchPoint.x};
+}
+
 // 現在位置を受信したときの処理
 static void OnRecievedCurrentPos(int &pos)
 {
@@ -61,6 +76,14 @@ static void OnRecievedControlState(int &state)
   Serial.println(state);
 }
 
+// 現在速度を受信したときの処理
+static void OnRecievedCurrentSpeed(int &speed)
+{
+  Serial.print("CurrentSpeed: ");
+  Serial.println(speed);
+  s_display.setCurrentSpeed(speed);
+}
+
 void setup()
 {
   auto cfg = M5.config();
@@ -72,6 +95,9 @@ void setup()
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentPos), &OnRecievedCurrentPos);
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentNumber), &OnRecievedCurrentNumber);
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::ControlState), &OnRecievedControlState);
+  MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentSpeed), &OnRecievedCurrentSpeed);
+  M5.Speaker.begin();
+  M5.Speaker.setVolume(255);
 }
 
 void loop()
@@ -109,16 +135,23 @@ void loop()
     // Bluetoothシリアルに送信
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
   }
+  if (M5.BtnB.wasReleaseFor(1000))
+  {
+    Serial.println("B was Long Pressed");
+    // Bluetoothシリアルに送信
+    MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::ResetOrigin));
+    M5.Speaker.tone(NOTE_C4, 100);
+  }
 
   // タッチパネル
   const uint8_t touchCount = M5.Touch.getCount();
   static bool s_lastTouched = false;
   const bool touched = touchCount > 0;
-  static lgfx::v1::touch_point_t s_lastTouchPoint;
+  static point_t s_lastTouchPoint;
   if (touched)
   {
     // タッチ位置取得
-    const lgfx::v1::touch_point_t touchPoint = M5.Touch.getTouchPointRaw();
+    const point_t touchPoint = getTouchPoint();
     if (!s_lastTouched)
     {
       // タッチ開始
@@ -127,7 +160,32 @@ void loop()
       Serial.print(", Y: ");
       Serial.println(touchPoint.y);
       // ディスプレイに通知
-      s_display.onTouched(touchPoint.x, touchPoint.y);
+      Event ev = s_display.onTouched(touchPoint.x, touchPoint.y);
+      // イベント処理
+      if (std::holds_alternative<EvChangeTargetNumber>(ev))
+      {
+        const EvChangeTargetNumber &evChangeTargetNumber = std::get<EvChangeTargetNumber>(ev);
+        s_targetNumber = evChangeTargetNumber.number;
+        Serial.print("Change target number: ");
+        Serial.println(s_targetNumber);
+        // Bluetoothシリアルに送信
+        MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
+        // 音を鳴らす
+        static const int NOTE_TABLE[10] = {
+            NOTE_C5,
+            NOTE_D5,
+            NOTE_E5,
+            NOTE_F5,
+            NOTE_G5,
+            NOTE_A5,
+            NOTE_B5,
+            NOTE_C6,
+            NOTE_D6,
+            NOTE_E6,
+        };
+        const int index = constrain(s_targetNumber - 1, 0, 9);
+        M5.Speaker.tone(NOTE_TABLE[index], 50);
+      }
     }
     // 最終タッチ位置更新
     s_lastTouchPoint = touchPoint;
