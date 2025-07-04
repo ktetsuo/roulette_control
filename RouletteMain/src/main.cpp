@@ -47,9 +47,11 @@ static RotationBuffer<int, 100> speedBuf;
 static repeating_timer motorControlTimer;
 
 // PWM=100のときの加速度
-static constexpr float accelPwm100 = 2.00f;
+// static constexpr float accelPwm100 = 2.00f;
+static constexpr float accelPwm100 = 1.00f;
 // モーターフリーのときの自然加速度（減速度）の絶対値
-static constexpr float accelFreeAbs = 0.4f;
+// static constexpr float accelFreeAbs = 0.4f;
+static constexpr float accelFreeAbs = 0.25f;
 // 速度がvのときの自然加速度（減速度）
 static constexpr float accelFree(float v)
 {
@@ -281,12 +283,14 @@ bool motorControlHandler(repeating_timer *t)
   speedSum -= speedBuf[speedBufIndex];
   speedSum += speed;
   const float speedAverage = static_cast<float>(speedSum) / SPEED_BUF_SIZE;
+  const float speedAverageAbs = fabs(speedAverage);
   speedBuf[speedBufIndex] = speed;
   speedBufIndex = (speedBufIndex + 1) % SPEED_BUF_SIZE;
 
   speedShortSum -= speedBufShort[speedBufShortIndex];
   speedShortSum += speed;
   const float speedShortAverage = static_cast<float>(speedShortSum) / SPEED_BUF_SHORT_SIZE;
+  const float speedShortAverageAbs = fabs(speedShortAverage);
   speedBufShort[speedBufShortIndex] = speed;
   speedBufShortIndex = (speedBufShortIndex + 1) % SPEED_BUF_SHORT_SIZE;
   // 平均加速度を求める
@@ -308,7 +312,8 @@ bool motorControlHandler(repeating_timer *t)
   const float estimatedStopPos = estimatedStopPosResult.value_or(lastEstimatedStopPos); // ゼロ除算が発生する場合は仕方ないので前回の値を使う
   lastEstimatedStopPos = estimatedStopPos;
   //
-  static float targetStopPos = 0.f; // 目標の位置
+  static float targetStopPos = 0.f;            // 目標の位置
+  static float waitDecelerationMaxSpeed = 0.f; // 減速待ちのときの最大速度
   float remainLength = 0.f;
   float targetAccel = 0.f;
   float relativeAccel = 0.f;
@@ -318,11 +323,13 @@ bool motorControlHandler(repeating_timer *t)
   switch (state)
   {
   case State::STOP:
-    if (100 < fabs(speedAverage))
+    if (25 < speedAverageAbs)
     {
       // 平均速度が一定以上になったら減速待ちに遷移
       state = State::WAIT_DECELERATION;
       targetStopPos = 0.f;
+      // 減速待ちのときの最大速度を記録
+      waitDecelerationMaxSpeed = speedAverageAbs;
     }
     if (g_startMeasure)
     {
@@ -334,9 +341,14 @@ bool motorControlHandler(repeating_timer *t)
     }
     break;
   case State::WAIT_DECELERATION:
-    if (fabs(speedAverage) <= 75)
+    if (waitDecelerationMaxSpeed < speedAverageAbs)
     {
-      // 平均速度が一定以下になったら制御状態へ遷移
+      // 減速待ちのときの最大速度を更新
+      waitDecelerationMaxSpeed = speedAverageAbs;
+    }
+    if (waitDecelerationMaxSpeed - speedAverageAbs > 5.f && speedAverageAbs <= 100)
+    {
+      // 減速待ちのときの最大速度と現在の平均速度の差が一定以上になったら制御状態へ遷移
       isLogging = true;
       targetStopPos = rouletteEncoder.nearestNumberTotalPos(estimatedStopPos, g_target); // 目標位置を固定
       tb6612.drive(g_accel);
@@ -348,7 +360,7 @@ bool motorControlHandler(repeating_timer *t)
     {
       // 目標位置までの距離を計算
       remainLength = targetStopPos - rouletteEncoder.totalPos();
-      if (fabs(remainLength) < 100.f)
+      if (fabs(remainLength) < 5.f)
       {
         // 目標位置到達
         tb6612.brake();
@@ -366,16 +378,14 @@ bool motorControlHandler(repeating_timer *t)
         tb6612.drive(pwmValue);
       }
     }
-    if (fabs(speedShortAverage) <= 10)
+    if (speedShortAverageAbs <= 5)
     {
-      tb6612.brake();
-      // tb6612.drive(100);
-      // isLogging = false;
+      tb6612.drive(0);
       state = State::LAST_BRAKE;
     }
     break;
   case State::LAST_BRAKE:
-    if (fabs(speedShortAverage) <= 1)
+    if (speedShortAverageAbs <= 1)
     {
       tb6612.drive(0);
       isLogging = false;
@@ -392,7 +402,7 @@ bool motorControlHandler(repeating_timer *t)
     }
     break;
   case State::MEASURE_AFTER:
-    if (fabs(speedShortAverage) <= 1)
+    if (speedShortAverageAbs <= 1)
     {
       // 減速完了
       tb6612.drive(0);
@@ -446,6 +456,7 @@ void setup()
   resetOrigin();
   SerialBT.begin();
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), &OnRecievedTargetNumber);
+  MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::ResetOrigin), &resetOrigin);
 }
 
 void loop()
@@ -521,19 +532,19 @@ void loop()
   numberWatcher.update(number);
   static ValueChangeWatcher<long> totalPosWatcher;
   // totalPosWatcher.update(totalPos / 10);
-  if (numberWatcher.isChanged() || totalPosWatcher.isChanged())
-  {
-    Serial.print("Number: ");
-    Serial.println(number);
-    Serial.print("RawPos: ");
-    Serial.println(rawPos);
-    Serial.print("Pos: ");
-    Serial.println(pos);
-    Serial.print("TotalPos: ");
-    Serial.println(totalPos);
-    Serial.print("LastPosDiff: ");
-    Serial.println(lastPosDiff);
-  }
+  // if (numberWatcher.isChanged() || totalPosWatcher.isChanged())
+  // {
+  //   Serial.print("Number: ");
+  //   Serial.println(number);
+  //   Serial.print("RawPos: ");
+  //   Serial.println(rawPos);
+  //   Serial.print("Pos: ");
+  //   Serial.println(pos);
+  //   Serial.print("TotalPos: ");
+  //   Serial.println(totalPos);
+  //   Serial.print("LastPosDiff: ");
+  //   Serial.println(lastPosDiff);
+  // }
   if (false)
   {
     Serial.print("DisableInterruptTime: ");
@@ -547,10 +558,16 @@ void loop()
   {
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentPos), pos);
   }
+  static ValueChangeWatcher<unsigned int> speedWatcher;
+  speedWatcher.update(lastPosDiff);
+  if (speedWatcher.isChanged())
+  {
+    MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentSpeed), lastPosDiff);
+  }
   if (numberWatcher.isChanged())
   {
-    Serial.print("Number: ");
-    Serial.println(number);
+    // Serial.print("Number: ");
+    // Serial.println(number);
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentNumber), number);
   }
   MsgPacketizer::update();
