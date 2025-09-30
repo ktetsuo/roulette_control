@@ -19,6 +19,9 @@ static XProtectVariable<ConnectionState> s_connectionState(ConnectionState::Disc
 
 static RouletteDisplay s_display(M5.Display);
 
+static const uint8_t SERIAL_TX_PIN = 33;
+static const uint8_t SERIAL_RX_PIN = 32;
+
 // Bluetooth接続タスク
 static void connectAsyncTask(void *parameter)
 {
@@ -90,12 +93,18 @@ void setup()
   M5.begin(cfg); // M5Unifiedの初期化
   Serial.begin(115200);
   SerialBT.begin("RouretteController", true); // Bluetooth device name
+  Serial1.begin(115200, SERIAL_8N1, SERIAL_RX_PIN, SERIAL_TX_PIN);
+
   xTaskCreate(connectAsyncTask, "ConnectAsyncTask", 4096, NULL, 0, NULL);
   s_display.init();
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentPos), &OnRecievedCurrentPos);
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentNumber), &OnRecievedCurrentNumber);
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::ControlState), &OnRecievedControlState);
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentSpeed), &OnRecievedCurrentSpeed);
+  MsgPacketizer::subscribe(Serial1, static_cast<uint8_t>(MsgIndex::CurrentPos), &OnRecievedCurrentPos);
+  MsgPacketizer::subscribe(Serial1, static_cast<uint8_t>(MsgIndex::CurrentNumber), &OnRecievedCurrentNumber);
+  MsgPacketizer::subscribe(Serial1, static_cast<uint8_t>(MsgIndex::ControlState), &OnRecievedControlState);
+  MsgPacketizer::subscribe(Serial1, static_cast<uint8_t>(MsgIndex::CurrentSpeed), &OnRecievedCurrentSpeed);
   M5.Speaker.begin();
   M5.Speaker.setVolume(255);
 }
@@ -118,6 +127,8 @@ void loop()
     s_display.setTargetNumber(s_targetNumber);
     // Bluetoothシリアルに送信
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
+    // ハードウェアシリアルにも送信
+    MsgPacketizer::send(Serial1, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
   }
   // Bボタンが押されたら
   if (M5.BtnB.wasPressed())
@@ -134,12 +145,16 @@ void loop()
     s_display.setTargetNumber(s_targetNumber);
     // Bluetoothシリアルに送信
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
+    // ハードウェアシリアルにも送信
+    MsgPacketizer::send(Serial1, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
   }
   if (M5.BtnB.wasReleaseFor(1000))
   {
     Serial.println("B was Long Pressed");
     // Bluetoothシリアルに送信
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::ResetOrigin));
+    // ハードウェアシリアルにも送信
+    MsgPacketizer::send(Serial1, static_cast<uint8_t>(MsgIndex::ResetOrigin));
     M5.Speaker.tone(NOTE_C4, 100);
   }
 
@@ -170,6 +185,8 @@ void loop()
         Serial.println(s_targetNumber);
         // Bluetoothシリアルに送信
         MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
+        // ハードウェアシリアルにも送信
+        MsgPacketizer::send(Serial1, static_cast<uint8_t>(MsgIndex::TargetNumber), s_targetNumber);
         // 音を鳴らす
         static const int NOTE_TABLE[10] = {
             NOTE_C5,
