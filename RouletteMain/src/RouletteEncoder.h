@@ -1,7 +1,7 @@
 #ifndef __ROULETTEENCODER_H__
 #define __ROULETTEENCODER_H__
 
-class AS5600;
+#include "AS5600.h"
 
 class RouletteEncoder
 {
@@ -28,9 +28,15 @@ public:
   unsigned int originPos() const;
   void originPos(unsigned int pos);
   long nearestNumberTotalPos(long p, unsigned int number) const;
+  static constexpr unsigned int maxRawAngle();
 
 private:
   unsigned int getRawAngle() const;
 };
+
+constexpr unsigned int RouletteEncoder::maxRawAngle()
+{
+  return AS5600::maxRawAngle();
+}
 
 #endif // __ROULETTEENCODER_H__
