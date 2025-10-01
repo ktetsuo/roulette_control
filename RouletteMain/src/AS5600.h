@@ -11,10 +11,10 @@ public:
   AS5600(TwoWire &twoWire);
   bool begin();
   unsigned int getRawAngle();
-  static constexpr unsigned int maxRowAngle();
+  static constexpr unsigned int maxRawAngle();
 };
 
-constexpr unsigned int AS5600::maxRowAngle()
+constexpr unsigned int AS5600::maxRawAngle()
 {
   return 4096;
 }
