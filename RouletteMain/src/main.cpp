@@ -351,6 +351,11 @@ bool motorControlHandler(repeating_timer *t)
       // 減速待ちのときの最大速度と現在の平均速度の差が一定以上になったら制御状態へ遷移
       isLogging = true;
       targetStopPos = rouletteEncoder.nearestNumberTotalPos(estimatedStopPos, g_target); // 目標位置を固定
+      // 最大±1/4目だけランダムでずらす
+      const float oneSegmentAngle = static_cast<float>(RouletteEncoder::maxRawAngle()) / 10.0f; // 1目の角度
+      const float randomOffset = (random(-25, 25 + 1) / 100.0f) * oneSegmentAngle;              // ±25% × 1目の大きさ
+      targetStopPos += randomOffset;
+
       tb6612.drive(g_accel);
       state = State::CONTROLING;
     }
@@ -449,6 +454,8 @@ void setup()
   tb6612In2.setup();
   tb6612Pwm.setup();
   tb6612.setup();
+  // 乱数シードを設定
+  randomSeed(analogRead(A0));
   // タイマー割り込み開始
   if (!add_repeating_timer_ms(4, motorControlHandler, nullptr, &motorControlTimer))
   {
