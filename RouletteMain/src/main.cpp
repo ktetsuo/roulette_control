@@ -438,6 +438,7 @@ void setup()
 {
   heartBeatLED.setup();
   Serial.begin(115200);
+  Serial1.begin(115200);
   Wire.setSDA(4);
   Wire.setSCL(5);
   Wire.begin();
@@ -457,6 +458,8 @@ void setup()
   SerialBT.begin();
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::TargetNumber), &OnRecievedTargetNumber);
   MsgPacketizer::subscribe(SerialBT, static_cast<uint8_t>(MsgIndex::ResetOrigin), &resetOrigin);
+  MsgPacketizer::subscribe(Serial1, static_cast<uint8_t>(MsgIndex::TargetNumber), &OnRecievedTargetNumber);
+  MsgPacketizer::subscribe(Serial1, static_cast<uint8_t>(MsgIndex::ResetOrigin), &resetOrigin);
 }
 
 void loop()
@@ -557,18 +560,21 @@ void loop()
   if (posWatcher.isChanged())
   {
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentPos), pos);
+    MsgPacketizer::send(Serial1, static_cast<uint8_t>(MsgIndex::CurrentPos), pos);
   }
   static ValueChangeWatcher<unsigned int> speedWatcher;
   speedWatcher.update(lastPosDiff);
   if (speedWatcher.isChanged())
   {
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentSpeed), lastPosDiff);
+    MsgPacketizer::send(Serial1, static_cast<uint8_t>(MsgIndex::CurrentSpeed), lastPosDiff);
   }
   if (numberWatcher.isChanged())
   {
     // Serial.print("Number: ");
     // Serial.println(number);
     MsgPacketizer::send(SerialBT, static_cast<uint8_t>(MsgIndex::CurrentNumber), number);
+    MsgPacketizer::send(Serial1, static_cast<uint8_t>(MsgIndex::CurrentNumber), number);
   }
   MsgPacketizer::update();
 }
