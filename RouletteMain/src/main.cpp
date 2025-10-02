@@ -361,28 +361,40 @@ bool motorControlHandler(repeating_timer *t)
     }
     break;
   case State::CONTROLING:
-    if (true)
+  {
+    // 目標位置までの距離を計算
+    remainLength = targetStopPos - rouletteEncoder.totalPos();
+
+    // 通り過ぎたかどうかを判定（移動方向と残り距離の符号が逆の場合）
+    const float oneSegmentAngle = static_cast<float>(RouletteEncoder::maxRawAngle()) / 10.0f;                         // 1目の角度
+    const bool isOvershoot = (speedShortAverage * remainLength < 0) && (fabs(remainLength) > oneSegmentAngle / 4.0f); // 速度と残り距離の符号が逆で、1/4目以上離れている
+
+    if (isOvershoot)
     {
-      // 目標位置までの距離を計算
-      remainLength = targetStopPos - rouletteEncoder.totalPos();
-      if (fabs(remainLength) < 5.f)
-      {
-        // 目標位置到達
-        tb6612.brake();
-        state = State::LAST_BRAKE;
-      }
-      else
-      {
-        // 現在の速度から目標位置でちょうど停止するための加速度を計算
-        targetAccel = -speedShortAverage * speedShortAverage / remainLength / 2.f;
-        // 自然減速からの相対加速度を計算
-        relativeAccel = targetAccel - accelFree(speedShortAverage);
-        // 相対加速度を出すためのPWM値を計算
-        pwmValue = pwmFromAccel(relativeAccel);
-        // PWM出力
-        tb6612.drive(pwmValue);
-      }
+      // WAIT_DECELERATIONに遷移して再制御
+      tb6612.drive(0);
+      isLogging = false;
+      state = State::WAIT_DECELERATION;
+      waitDecelerationMaxSpeed = speedAverageAbs;
     }
+    else if (fabs(remainLength) < 5.f)
+    {
+      // 目標位置到達
+      tb6612.brake();
+      state = State::LAST_BRAKE;
+    }
+    else
+    {
+      // 現在の速度から目標位置でちょうど停止するための加速度を計算
+      targetAccel = -speedShortAverage * speedShortAverage / remainLength / 2.f;
+      // 自然減速からの相対加速度を計算
+      relativeAccel = targetAccel - accelFree(speedShortAverage);
+      // 相対加速度を出すためのPWM値を計算
+      pwmValue = pwmFromAccel(relativeAccel);
+      // PWM出力
+      tb6612.drive(pwmValue);
+    }
+  }
     if (speedShortAverageAbs <= 5)
     {
       tb6612.drive(0);
@@ -390,12 +402,9 @@ bool motorControlHandler(repeating_timer *t)
     }
     break;
   case State::LAST_BRAKE:
-    if (speedShortAverageAbs <= 1)
-    {
-      tb6612.drive(0);
-      isLogging = false;
-      state = State::STOP;
-    }
+    tb6612.drive(0);
+    isLogging = false;
+    state = State::STOP;
     break;
   case State::MEASURE:
     if (logBuf.isFilled())
