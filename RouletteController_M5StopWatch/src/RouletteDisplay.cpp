@@ -61,17 +61,6 @@ void RouletteDisplay::init()
 
 void RouletteDisplay::update()
 {
-    const unsigned long ms = millis();
-    if (3 <= abs(_currentSpeed))
-    {
-        _mode = Mode::Display;
-        _lastDisplayTime = ms;
-    }
-    else if ((_mode == Mode::Display) && (1000 < ms - _lastDisplayTime))
-    {
-        _mode = Mode::Setting;
-    }
-
     _display.startWrite();
     _display.setFont(&fonts::Font0);
     _display.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -106,11 +95,6 @@ void RouletteDisplay::update()
     drawCenterNumber(_mode == Mode::Display ? _currentNumber : _targetNumber,
                      circleX + _circleCenterX, circleY + _circleCenterY);
 
-    if (1000 <= ms - _lastToggleTime)
-    {
-        _lastToggleTime = ms;
-        _toggleOn = !_toggleOn;
-    }
     if (_mode == Mode::Setting && _toggleOn)
     {
         _display.setFont(&fonts::Font4);
