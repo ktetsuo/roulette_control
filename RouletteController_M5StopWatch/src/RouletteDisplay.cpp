@@ -1,12 +1,18 @@
 #include "RouletteDisplay.h"
 #include <M5Unified.h>
 #include <cmath>
+#include "MathConstexpr.h"
 
+static constexpr int _displayWidth = 466;
+static constexpr int _displayHeight = 466;
 static constexpr int _circleDiameter = 400;
 static constexpr int _innerCircleDiameter = 180;
 static constexpr int _outerCircleBorder = 10;
 static constexpr int _innerCircleBorder = 20;
 
+static constexpr int _displayCenterX = _displayWidth / 2 - 1;
+static constexpr int _displayCenterY = _displayHeight / 2 - 1;
+static constexpr int _displayRadius = std::min(_displayWidth, _displayHeight) / 2 - 1;
 static constexpr int _circleRadius = _circleDiameter / 2 - 1;
 static constexpr int _innerCircleRadius = _innerCircleDiameter / 2 - 1;
 static constexpr int _circleCenterX = _circleDiameter / 2 - 1;
@@ -15,10 +21,6 @@ static constexpr int _segmentWidth = 220;
 static constexpr int _segmentHeight = 240;
 static constexpr int _segmentPivotX = 0;
 static constexpr int _segmentPivotY = 150;
-static constexpr float COS_18 = 0.9510565f; // cos(18 degrees)
-static constexpr float SIN_18 = 0.3090170f; // sin(18 degrees)
-static constexpr int _numberPosX = _circleCenterX + (_circleRadius - _outerCircleBorder + _innerCircleRadius + _innerCircleBorder) / 2 * COS_18;
-static constexpr int _numberPosY = _circleCenterY - (_circleRadius - _outerCircleBorder + _innerCircleRadius + _innerCircleBorder) / 2 * SIN_18;
 
 static uint32_t numberColor(int number)
 {
@@ -66,7 +68,6 @@ void RouletteDisplay::init()
 void RouletteDisplay::update()
 {
     _display.startWrite();
-    _display.fillScreen(TFT_BLACK);
     _display.setFont(&fonts::Font0);
     _display.setTextColor(TFT_WHITE, TFT_BLACK);
     _display.setTextSize(1);
@@ -135,8 +136,8 @@ void RouletteDisplay::createSegmentSprites()
             numberGlyph.print(number);
             numberGlyph.setPivot(numberGlyph.width() / 2, numberGlyph.height() / 2);
             const float numberAngle = (-18.f + 36.f * numberIndex) * 3.14159265f / 180.f;
-            const int numberX = _segmentPivotX + static_cast<int>(149.f * std::cos(numberAngle));
-            const int numberY = _segmentPivotY + static_cast<int>(149.f * std::sin(numberAngle));
+            const int numberX = _segmentPivotX + static_cast<int>(149.f * cos_constexpr(numberAngle));
+            const int numberY = _segmentPivotY + static_cast<int>(149.f * sin_constexpr(numberAngle));
             numberGlyph.pushRotateZoom(&segment, numberX, numberY,
                                        63.f + 36.f * numberIndex,
                                        1.f, 1.f, TFT_TRANSPARENT);
@@ -160,12 +161,30 @@ void RouletteDisplay::drawRoulette(int centerNumber, bool drawNeedle)
     drawCenterNumber(centerNumber, centerX, centerY);
     if (drawNeedle)
     {
-        // const int needleTip = static_cast<int>(10 * scale);
-        // const int needleLength = static_cast<int>(60 * scale);
-        // _circleSprite.fillTriangle(size - needleTip, 0, size, needleTip,
-        //                            size - needleLength, needleLength, TFT_WHITE);
-        // _circleSprite.drawTriangle(size - needleTip, 0, size, needleTip,
-        //                            size - needleLength, needleLength, TFT_DARKGRAY);
+        constexpr float needleAngle = M_PI / 4;           // 針の角度[rad]
+        constexpr float needleWidth = 5.f * M_PI / 180.f; // 針の幅角度[rad]
+        constexpr int needleX0 = _displayCenterX + static_cast<int>(_circleRadius * cos_constexpr(needleAngle));
+        constexpr int needleY0 = _displayCenterY - static_cast<int>(_circleRadius * sin_constexpr(needleAngle));
+        constexpr int needleX1 = _displayCenterX + static_cast<int>(_displayRadius * cos_constexpr(needleAngle + needleWidth));
+        constexpr int needleY1 = _displayCenterY - static_cast<int>(_displayRadius * sin_constexpr(needleAngle + needleWidth));
+        constexpr int needleX2 = _displayCenterX + static_cast<int>(_displayRadius * cos_constexpr(needleAngle - needleWidth));
+        constexpr int needleY2 = _displayCenterY - static_cast<int>(_displayRadius * sin_constexpr(needleAngle - needleWidth));
+        _display.fillTriangle(
+            needleX0,
+            needleY0,
+            needleX1,
+            needleY1,
+            needleX2,
+            needleY2,
+            TFT_WHITE);
+        _display.drawTriangle(
+            needleX0,
+            needleY0,
+            needleX1,
+            needleY1,
+            needleX2,
+            needleY2,
+            TFT_DARKGRAY);
     }
 }
 
