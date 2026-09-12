@@ -8,7 +8,9 @@ static constexpr int _displayHeight = 466;
 static constexpr int _circleDiameter = 400;
 static constexpr int _innerCircleDiameter = 180;
 static constexpr int _outerCircleBorder = 10;
-static constexpr int _innerCircleBorder = 20;
+static constexpr int _innerCircleBorder = 10;
+static constexpr int _textMargin = 15;
+static constexpr int _innerCircleTextMargin = 30;
 
 static constexpr int _displayCenterX = _displayWidth / 2 - 1;
 static constexpr int _displayCenterY = _displayHeight / 2 - 1;
@@ -17,10 +19,11 @@ static constexpr int _circleRadius = _circleDiameter / 2 - 1;
 static constexpr int _innerCircleRadius = _innerCircleDiameter / 2 - 1;
 static constexpr int _circleCenterX = _circleDiameter / 2 - 1;
 static constexpr int _circleCenterY = _circleDiameter / 2 - 1;
-static constexpr int _segmentWidth = 220;
-static constexpr int _segmentHeight = 240;
+
+static constexpr int _segmentWidth = _circleRadius - _outerCircleBorder;
+static constexpr int _segmentHeight = _circleRadius - _outerCircleBorder;
 static constexpr int _segmentPivotX = 0;
-static constexpr int _segmentPivotY = 150;
+static constexpr int _segmentPivotY = 0;
 
 static uint32_t numberColor(int number)
 {
@@ -115,7 +118,7 @@ void RouletteDisplay::createSegmentSprites()
         for (int numberIndex = 0; numberIndex < 2; numberIndex++)
         {
             const int number = spriteIndex * 2 + numberIndex + 1;
-            const float segmentStart = -45.f + 36.f * numberIndex;
+            const float segmentStart = 36.f * numberIndex;
             const float segmentEnd = segmentStart + 36.f;
             segment.fillArc(_segmentPivotX, _segmentPivotY,
                             _circleRadius - _outerCircleBorder,
@@ -123,23 +126,26 @@ void RouletteDisplay::createSegmentSprites()
                             segmentStart, segmentEnd, numberColor(number));
 
             M5Canvas numberGlyph(&segment);
-            numberGlyph.createSprite(64, 64);
+            numberGlyph.setFont(&fonts::Font8);
+            const int fontWidth = numberGlyph.textWidth(String(number));
+            const int fontHeight = numberGlyph.fontHeight();
+            const float textScale = static_cast<float>(_circleRadius - _outerCircleBorder - _innerCircleBorder - _innerCircleRadius - _textMargin * 2) / static_cast<float>(fontHeight);
+            const int textWidth = fontWidth * textScale;
+            const int textHeight = fontHeight * textScale;
+            numberGlyph.setTextSize(textScale);
+            numberGlyph.createSprite(textWidth, textHeight);
             numberGlyph.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT);
             numberGlyph.setBaseColor(TFT_TRANSPARENT);
             numberGlyph.fillSprite(TFT_TRANSPARENT);
-            numberGlyph.setFont(&fonts::Font8);
-            numberGlyph.setTextSize(1);
-            const int16_t x = (numberGlyph.width() - numberGlyph.textWidth(String(number))) / 2;
-            const int16_t y = (numberGlyph.height() - numberGlyph.fontHeight()) / 2 + 5;
             numberGlyph.setTextColor(TFT_WHITE);
-            numberGlyph.setCursor(x, y);
+            numberGlyph.setCursor(0, 0);
             numberGlyph.print(number);
             numberGlyph.setPivot(numberGlyph.width() / 2, numberGlyph.height() / 2);
-            const float numberAngle = (-18.f + 36.f * numberIndex) * 3.14159265f / 180.f;
+            const float numberAngle = (18.f + 36.f * numberIndex) * 3.14159265f / 180.f;
             const int numberX = _segmentPivotX + static_cast<int>(149.f * cos_constexpr(numberAngle));
             const int numberY = _segmentPivotY + static_cast<int>(149.f * sin_constexpr(numberAngle));
             numberGlyph.pushRotateZoom(&segment, numberX, numberY,
-                                       63.f + 36.f * numberIndex,
+                                       90.f + 18.f + 36.f * numberIndex,
                                        1.f, 1.f, TFT_TRANSPARENT);
         }
     }
@@ -214,9 +220,14 @@ void RouletteDisplay::drawCenterNumber(int centerNumber, int16_t centerX, int16_
     _display.setColor(numberColor(centerNumber));
     _display.fillEllipse(centerX, centerY, _innerCircleRadius, _innerCircleRadius);
     _display.setFont(&fonts::Font8);
-    _display.setTextSize(2);
-    const int16_t x = centerX - _display.textWidth(String(centerNumber)) / 2;
-    const int16_t y = centerY - _display.fontHeight() / 2 + 5;
+    const int fontWidth = _display.textWidth(String(centerNumber));
+    const int fontHeight = _display.fontHeight();
+    const float textScale = static_cast<float>(_innerCircleDiameter - _innerCircleTextMargin * 2) / static_cast<float>(fontHeight);
+    const int textWidth = fontWidth * textScale;
+    const int textHeight = fontHeight * textScale;
+    _display.setTextSize(textScale);
+    const int x = centerX - textWidth / 2;
+    const int y = centerY - textHeight / 2;
     _display.setTextColor(TFT_BLACK);
     _display.setCursor(x + 1, y + 1);
     _display.print(centerNumber);
