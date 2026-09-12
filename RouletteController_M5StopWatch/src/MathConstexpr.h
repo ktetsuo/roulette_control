@@ -117,7 +117,7 @@ constexpr T cos_constexpr(T theta)
     }
     else if (theta < pi * static_cast<T>(3) / static_cast<T>(2))
     {
-        return -sin_partial_constexpr(theta - pi);
+        return -sin_partial_constexpr(pi * static_cast<T>(3) / static_cast<T>(2) - theta);
     }
     else if (theta < pi * static_cast<T>(7) / static_cast<T>(4))
     {
