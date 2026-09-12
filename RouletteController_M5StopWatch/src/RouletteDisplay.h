@@ -22,13 +22,13 @@ public:
     Event onTouched(int x, int y);
 
 private:
-    void drawRoulette(int centerNumber, bool drawNeedle);
+    void drawRouletteBase();
+    void drawCenterNumber(int centerNumber, int16_t centerX, int16_t centerY);
     Event onTouchedCenterCircle();
     Event onTouchedNumber(int number);
 
 private:
     M5GFX &_display;
-    M5Canvas _numberSprite;
     M5Canvas _circleSprite;
     int _targetNumber = 1;
     int _currentNumber = 1;
