@@ -7,7 +7,7 @@ static constexpr int _displayWidth = 466;
 static constexpr int _displayHeight = 466;
 static constexpr int _circleDiameter = 400;
 static constexpr int _innerCircleDiameter = 180;
-static constexpr int _outerCircleBorder = 10;
+static constexpr int _outerCircleBorder = 5;
 static constexpr int _innerCircleBorder = 10;
 static constexpr int _textMargin = 15;
 static constexpr int _innerCircleTextMargin = 30;
@@ -24,6 +24,12 @@ static constexpr int _segmentWidth = _circleRadius - _outerCircleBorder;
 static constexpr int _segmentHeight = _circleRadius - _outerCircleBorder;
 static constexpr int _segmentPivotX = 0;
 static constexpr int _segmentPivotY = 0;
+static constexpr char _selectNumberMessage[] = "SELECT NUMBER";
+static constexpr int _selectNumberCharacterCount = sizeof(_selectNumberMessage) - 1;
+static constexpr float _selectNumberArcStart = -150.f * M_PI / 180.f;
+static constexpr float _selectNumberArcStep = 120.f * M_PI / 180.f /
+                                              (_selectNumberCharacterCount - 1);
+static constexpr int _selectNumberRadius = _displayRadius - _textMargin;
 
 static uint32_t numberColor(int number)
 {
@@ -49,7 +55,8 @@ static uint32_t numberColor(int number)
 RouletteDisplay::RouletteDisplay(M5GFX &display)
     : _display(display),
       _segmentSprites{M5Canvas(&display), M5Canvas(&display), M5Canvas(&display),
-                      M5Canvas(&display), M5Canvas(&display)}
+                      M5Canvas(&display), M5Canvas(&display)},
+      _selectNumberMessageSprite(&display)
 {
 }
 
@@ -64,6 +71,7 @@ void RouletteDisplay::init()
     _display.setBrightness(255);
     _display.setRotation(0);
     createSegmentSprites();
+    createSelectNumberMessageSprite();
     _display.clear();
     update();
 }
@@ -90,19 +98,48 @@ void RouletteDisplay::update()
 
     drawRoulette(_mode == Mode::Display ? _currentNumber : _targetNumber,
                  _mode == Mode::Display);
-    if (_mode == Mode::Setting && _toggleOn)
-    {
-        _display.setFont(&fonts::Font4);
-        _display.setCursor(16, 7);
-        _display.setTextColor(TFT_WHITE, TFT_BLACK);
-        _display.setTextSize(1);
-        _display.print("SELECT NUMBER");
-    }
-    else
-    {
-        _display.fillRect(0, 0, 240, 40, TFT_BLACK);
-    }
+    _selectNumberMessageSprite.pushSprite(&_display, 0, 0, TFT_TRANSPARENT);
+
     _display.endWrite();
+}
+
+void RouletteDisplay::createSelectNumberMessageSprite()
+{
+    _selectNumberMessageSprite.createSprite(_displayWidth, _displayHeight);
+    _selectNumberMessageSprite.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT);
+    _selectNumberMessageSprite.setBaseColor(TFT_TRANSPARENT);
+    _selectNumberMessageSprite.fillSprite(TFT_TRANSPARENT);
+
+    M5Canvas fontCanvas(&_display);
+    fontCanvas.setFont(&fonts::Font4);
+    const int fontHeight = fontCanvas.fontHeight();
+    const float scale = static_cast<float>(_displayRadius - _circleRadius) / static_cast<float>(fontHeight);
+    fontCanvas.setTextSize(scale);
+    for (int i = 0; i < _selectNumberCharacterCount; i++)
+    {
+        const char characterValue = _selectNumberMessage[i];
+        const int characterWidth = fontCanvas.textWidth(String(characterValue));
+        const int characterHeight = fontCanvas.fontHeight();
+        M5Canvas character(&_selectNumberMessageSprite);
+        character.createSprite(std::max(1, characterWidth + 4), characterHeight + 4);
+        character.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT);
+        character.setBaseColor(TFT_TRANSPARENT);
+        character.fillSprite(TFT_TRANSPARENT);
+        character.setFont(&fonts::Font4);
+        character.setTextSize(scale);
+        character.setTextColor(TFT_WHITE);
+        character.setCursor(2, 2);
+        character.print(characterValue);
+        character.setPivot(character.width() / 2, character.height() / 2);
+        const float angle = _selectNumberArcStart + _selectNumberArcStep * i;
+        const int16_t x = _displayWidth / 2 +
+                          static_cast<int16_t>(_selectNumberRadius * cos_constexpr(angle));
+        const int16_t y = _displayHeight / 2 +
+                          static_cast<int16_t>(_selectNumberRadius * sin_constexpr(angle));
+        character.pushRotateZoom(
+            &_selectNumberMessageSprite, x, y, angle * 180.f / M_PI + 90.f,
+            1.f, 1.f, TFT_TRANSPARENT);
+    }
 }
 
 void RouletteDisplay::createSegmentSprites()

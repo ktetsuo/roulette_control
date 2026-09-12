@@ -23,6 +23,7 @@ public:
 
 private:
     void createSegmentSprites();
+    void createSelectNumberMessageSprite();
     void drawRoulette(int centerNumber, bool drawNeedle);
     void drawCenterNumber(int centerNumber, int16_t centerX, int16_t centerY);
     Event onTouchedCenterCircle();
@@ -31,6 +32,7 @@ private:
 private:
     M5GFX &_display;
     M5Canvas _segmentSprites[5];
+    M5Canvas _selectNumberMessageSprite;
     int _targetNumber = 1;
     int _currentNumber = 1;
     int _currentPos = 0;
