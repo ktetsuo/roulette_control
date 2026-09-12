@@ -1,5 +1,20 @@
 #include "RouletteDisplay.h"
 #include <M5Unified.h>
+#include <cmath>
+
+static constexpr int _circleDiameter = 400;
+static constexpr int _innerCircleDiameter = 180;
+static constexpr int _outerCircleBorder = 10;
+static constexpr int _innerCircleBorder = 20;
+
+static constexpr int _circleRadius = _circleDiameter / 2 - 1;
+static constexpr int _innerCircleRadius = _innerCircleDiameter / 2 - 1;
+static constexpr int _circleCenterX = _circleDiameter / 2 - 1;
+static constexpr int _circleCenterY = _circleDiameter / 2 - 1;
+static constexpr float COS_18 = 0.9510565f; // cos(18 degrees)
+static constexpr float SIN_18 = 0.3090170f; // sin(18 degrees)
+static constexpr int _numberPosX = _circleCenterX + (_circleRadius - _outerCircleBorder + _innerCircleRadius + _innerCircleBorder) / 2 * COS_18;
+static constexpr int _numberPosY = _circleCenterY - (_circleRadius - _outerCircleBorder + _innerCircleRadius + _innerCircleBorder) / 2 * SIN_18;
 
 static uint32_t numberColor(int number)
 {
@@ -40,10 +55,8 @@ void RouletteDisplay::init()
     _numberSprite.createSprite(64, 64);
     _numberSprite.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT);
     _numberSprite.setBaseColor(TFT_TRANSPARENT);
-    const int16_t circleSize = _display.width() < _display.height()
-                                   ? _display.width()
-                                   : _display.height();
-    _circleSprite.createSprite(circleSize, circleSize);
+    _circleSprite.createSprite(_circleDiameter, _circleDiameter);
+    _circleSprite.setPivot(_circleCenterX, _circleCenterY);
     _display.clear();
     update();
 }
@@ -80,17 +93,20 @@ void RouletteDisplay::update()
     }
 
     _circleSprite.fillSprite(TFT_BLACK);
+    float rouletteAngle = 0.f;
     if (_mode == Mode::Display)
     {
-        drawRoulette(_currentNumber, _currentPos * 360. / 4096., true);
+        rouletteAngle = _currentPos * 360. / 4096.;
+        drawRoulette(_currentNumber, true);
     }
     else
     {
-        drawRoulette(_targetNumber, 0, false);
+        drawRoulette(_targetNumber, false);
     }
     const int16_t circleX = (_display.width() - _circleSprite.width()) / 2;
     const int16_t circleY = (_display.height() - _circleSprite.height()) / 2;
-    _circleSprite.pushSprite(circleX, circleY);
+    _circleSprite.pushRotateZoom(&_display, circleX + _circleCenterX, circleY + _circleCenterY,
+                                 rouletteAngle, 1.f, 1.f, TFT_BLACK);
 
     if (1000 <= ms - _lastToggleTime)
     {
@@ -112,38 +128,40 @@ void RouletteDisplay::update()
     _display.endWrite();
 }
 
-void RouletteDisplay::drawRoulette(int centerNumber, float angle, bool drawNeedle)
+void RouletteDisplay::drawRoulette(int centerNumber, bool drawNeedle)
 {
-    const float scale = _circleSprite.width() / 240.0f;
-    const int size = _circleSprite.width();
-    const int centerX = size / 2;
-    const int centerY = size / 2;
-    const int outerRadius = size / 2 - 1;
     _circleSprite.setColor(TFT_WHITE);
-    _circleSprite.fillEllipse(centerX, centerY, outerRadius, outerRadius);
+    _circleSprite.fillEllipse(_circleCenterX, _circleCenterY, _circleRadius, _circleRadius);
     _circleSprite.setColor(numberColor(centerNumber));
-    _circleSprite.fillEllipse(centerX, centerY, static_cast<int>(49 * scale),
-                              static_cast<int>(49 * scale));
+    _circleSprite.fillEllipse(_circleCenterX, _circleCenterY, _innerCircleRadius, _innerCircleRadius);
     for (int i = 1; i <= 10; i++)
     {
-        _circleSprite.fillArc(centerX, centerY, outerRadius - static_cast<int>(5 * scale),
-                              static_cast<int>(59 * scale),
-                              360 + 360. / 10 * (i - 1) - 45 - angle,
-                              360 + 360. / 10 * i - 45 - angle, numberColor(i));
+        _circleSprite.fillArc(_circleCenterX, _circleCenterY, _circleRadius - _outerCircleBorder,
+                              _innerCircleRadius + _innerCircleBorder,
+                              360 + 360. / 10 * (i - 1) - 45,
+                              360 + 360. / 10 * i - 45, numberColor(i));
         _numberSprite.fillSprite(TFT_TRANSPARENT);
-        _numberSprite.setFont(&fonts::Font6);
+        _numberSprite.setFont(&fonts::Font8);
         _numberSprite.setTextSize(1);
         const int16_t x = (_numberSprite.width() - _numberSprite.textWidth(String(i))) / 2;
         const int16_t y = (_numberSprite.height() - _numberSprite.fontHeight()) / 2 + 5;
         _numberSprite.setTextColor(TFT_WHITE);
         _numberSprite.setCursor(x, y);
         _numberSprite.print(i);
-        _numberSprite.setPivot(32, 120);
-        _numberSprite.pushRotateZoom(centerX, centerY, 90 + 18 + 36 * (i - 1) - 45 - angle,
-                                     scale, scale, TFT_TRANSPARENT);
+        _numberSprite.setPivot(_numberSprite.width() / 2, _numberSprite.height() / 2);
+        const float numberAngle = 36.f * (i - 1) * 3.14159265f / 180.f;
+        const int numberX = _circleCenterX +
+                            static_cast<int>((_numberPosX - _circleCenterX) * std::cos(numberAngle) -
+                                             (_numberPosY - _circleCenterY) * std::sin(numberAngle));
+        const int numberY = _circleCenterY +
+                            static_cast<int>((_numberPosX - _circleCenterX) * std::sin(numberAngle) +
+                                             (_numberPosY - _circleCenterY) * std::cos(numberAngle));
+        _numberSprite.pushRotateZoom(numberX, numberY,
+                                     90 + 18 + 36 * (i - 1) - 45,
+                                     1.f, 1.f, TFT_TRANSPARENT);
     }
-    _circleSprite.setFont(&fonts::Font6);
-    _circleSprite.setTextSize(static_cast<uint8_t>(2 * scale + 0.5f));
+    _circleSprite.setFont(&fonts::Font8);
+    _circleSprite.setTextSize(2);
     const int16_t x = (_circleSprite.width() - _circleSprite.textWidth(String(centerNumber))) / 2;
     const int16_t y = (_circleSprite.height() - _circleSprite.fontHeight()) / 2 + 5;
     _circleSprite.setTextColor(TFT_BLACK);
@@ -160,12 +178,12 @@ void RouletteDisplay::drawRoulette(int centerNumber, float angle, bool drawNeedl
     _circleSprite.print(centerNumber);
     if (drawNeedle)
     {
-        const int needleTip = static_cast<int>(10 * scale);
-        const int needleLength = static_cast<int>(60 * scale);
-        _circleSprite.fillTriangle(size - needleTip, 0, size, needleTip,
-                                   size - needleLength, needleLength, TFT_WHITE);
-        _circleSprite.drawTriangle(size - needleTip, 0, size, needleTip,
-                                   size - needleLength, needleLength, TFT_DARKGRAY);
+        // const int needleTip = static_cast<int>(10 * scale);
+        // const int needleLength = static_cast<int>(60 * scale);
+        // _circleSprite.fillTriangle(size - needleTip, 0, size, needleTip,
+        //                            size - needleLength, needleLength, TFT_WHITE);
+        // _circleSprite.drawTriangle(size - needleTip, 0, size, needleTip,
+        //                            size - needleLength, needleLength, TFT_DARKGRAY);
     }
 }
 

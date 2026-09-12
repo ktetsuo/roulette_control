@@ -22,7 +22,7 @@ public:
     Event onTouched(int x, int y);
 
 private:
-    void drawRoulette(int centerNumber, float angle, bool drawNeedle);
+    void drawRoulette(int centerNumber, bool drawNeedle);
     Event onTouchedCenterCircle();
     Event onTouchedNumber(int number);
 
