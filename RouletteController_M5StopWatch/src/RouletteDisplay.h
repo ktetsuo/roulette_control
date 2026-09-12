@@ -22,14 +22,15 @@ public:
     Event onTouched(int x, int y);
 
 private:
-    void drawRouletteBase();
+    void createSegmentSprites();
+    void drawRoulette(int centerNumber, bool drawNeedle);
     void drawCenterNumber(int centerNumber, int16_t centerX, int16_t centerY);
     Event onTouchedCenterCircle();
     Event onTouchedNumber(int number);
 
 private:
     M5GFX &_display;
-    M5Canvas _circleSprite;
+    M5Canvas _segmentSprites[10];
     int _targetNumber = 1;
     int _currentNumber = 1;
     int _currentPos = 0;

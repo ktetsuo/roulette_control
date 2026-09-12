@@ -11,6 +11,10 @@ static constexpr int _circleRadius = _circleDiameter / 2 - 1;
 static constexpr int _innerCircleRadius = _innerCircleDiameter / 2 - 1;
 static constexpr int _circleCenterX = _circleDiameter / 2 - 1;
 static constexpr int _circleCenterY = _circleDiameter / 2 - 1;
+static constexpr int _segmentWidth = 220;
+static constexpr int _segmentHeight = 160;
+static constexpr int _segmentPivotX = 0;
+static constexpr int _segmentPivotY = 150;
 static constexpr float COS_18 = 0.9510565f; // cos(18 degrees)
 static constexpr float SIN_18 = 0.3090170f; // sin(18 degrees)
 static constexpr int _numberPosX = _circleCenterX + (_circleRadius - _outerCircleBorder + _innerCircleRadius + _innerCircleBorder) / 2 * COS_18;
@@ -38,7 +42,11 @@ static uint32_t numberColor(int number)
 }
 
 RouletteDisplay::RouletteDisplay(M5GFX &display)
-    : _display(display), _circleSprite(&display)
+    : _display(display),
+      _segmentSprites{M5Canvas(&display), M5Canvas(&display), M5Canvas(&display),
+                      M5Canvas(&display), M5Canvas(&display), M5Canvas(&display),
+                      M5Canvas(&display), M5Canvas(&display), M5Canvas(&display),
+                      M5Canvas(&display)}
 {
 }
 
@@ -52,9 +60,7 @@ void RouletteDisplay::init()
     _lastDisplayTime = millis();
     _display.setBrightness(255);
     _display.setRotation(0);
-    _circleSprite.createSprite(_circleDiameter, _circleDiameter);
-    _circleSprite.setPivot(_circleCenterX, _circleCenterY);
-    drawRouletteBase();
+    createSegmentSprites();
     _display.clear();
     update();
 }
@@ -62,6 +68,7 @@ void RouletteDisplay::init()
 void RouletteDisplay::update()
 {
     _display.startWrite();
+    _display.fillScreen(TFT_BLACK);
     _display.setFont(&fonts::Font0);
     _display.setTextColor(TFT_WHITE, TFT_BLACK);
     _display.setTextSize(1);
@@ -79,22 +86,8 @@ void RouletteDisplay::update()
         break;
     }
 
-    float rouletteAngle = 0.f;
-    if (_mode == Mode::Display)
-    {
-        rouletteAngle = _currentPos * 360. / 4096.;
-    }
-    else
-    {
-        rouletteAngle = 0.f;
-    }
-    const int16_t circleX = (_display.width() - _circleSprite.width()) / 2;
-    const int16_t circleY = (_display.height() - _circleSprite.height()) / 2;
-    _circleSprite.pushRotateZoom(&_display, circleX + _circleCenterX, circleY + _circleCenterY,
-                                 rouletteAngle, 1.f, 1.f, TFT_BLACK);
-    drawCenterNumber(_mode == Mode::Display ? _currentNumber : _targetNumber,
-                     circleX + _circleCenterX, circleY + _circleCenterY);
-
+    drawRoulette(_mode == Mode::Display ? _currentNumber : _targetNumber,
+                 _mode == Mode::Display);
     if (_mode == Mode::Setting && _toggleOn)
     {
         _display.setFont(&fonts::Font4);
@@ -110,41 +103,86 @@ void RouletteDisplay::update()
     _display.endWrite();
 }
 
-void RouletteDisplay::drawRouletteBase()
+void RouletteDisplay::createSegmentSprites()
 {
-    M5Canvas numberSprite(&_circleSprite);
-    numberSprite.createSprite(64, 64);
-    numberSprite.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT);
-    numberSprite.setBaseColor(TFT_TRANSPARENT);
-    _circleSprite.fillSprite(TFT_BLACK);
-    _circleSprite.setColor(TFT_WHITE);
-    _circleSprite.fillEllipse(_circleCenterX, _circleCenterY, _circleRadius, _circleRadius);
     for (int i = 1; i <= 10; i++)
     {
-        _circleSprite.fillArc(_circleCenterX, _circleCenterY, _circleRadius - _outerCircleBorder,
-                              _innerCircleRadius + _innerCircleBorder,
-                              360 + 360. / 10 * (i - 1) - 45,
-                              360 + 360. / 10 * i - 45, numberColor(i));
-        numberSprite.fillSprite(TFT_TRANSPARENT);
-        numberSprite.setFont(&fonts::Font8);
-        numberSprite.setTextSize(1);
-        const int16_t x = (numberSprite.width() - numberSprite.textWidth(String(i))) / 2;
-        const int16_t y = (numberSprite.height() - numberSprite.fontHeight()) / 2 + 5;
-        numberSprite.setTextColor(TFT_WHITE);
-        numberSprite.setCursor(x, y);
-        numberSprite.print(i);
-        numberSprite.setPivot(numberSprite.width() / 2, numberSprite.height() / 2);
-        const float numberAngle = 36.f * (i - 1) * 3.14159265f / 180.f;
-        const int numberX = _circleCenterX +
-                            static_cast<int>((_numberPosX - _circleCenterX) * std::cos(numberAngle) -
-                                             (_numberPosY - _circleCenterY) * std::sin(numberAngle));
-        const int numberY = _circleCenterY +
-                            static_cast<int>((_numberPosX - _circleCenterX) * std::sin(numberAngle) +
-                                             (_numberPosY - _circleCenterY) * std::cos(numberAngle));
-        numberSprite.pushRotateZoom(numberX, numberY,
-                                    90 + 18 + 36 * (i - 1) - 45,
-                                    1.f, 1.f, TFT_TRANSPARENT);
+        M5Canvas &segment = _segmentSprites[i - 1];
+        segment.createSprite(_segmentWidth, _segmentHeight);
+        segment.setPivot(_segmentPivotX, _segmentPivotY);
+        segment.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT);
+        segment.setBaseColor(TFT_TRANSPARENT);
+        segment.fillSprite(TFT_TRANSPARENT);
+        segment.setColor(numberColor(i));
+        segment.fillArc(_segmentPivotX, _segmentPivotY,
+                        _circleRadius - _outerCircleBorder,
+                        _innerCircleRadius + _innerCircleBorder,
+                        -45.f, -9.f, numberColor(i));
+
+        M5Canvas numberGlyph(&segment);
+        numberGlyph.createSprite(64, 64);
+        numberGlyph.setBitmapColor(TFT_BLACK, TFT_TRANSPARENT);
+        numberGlyph.setBaseColor(TFT_TRANSPARENT);
+        numberGlyph.fillSprite(TFT_TRANSPARENT);
+        numberGlyph.setFont(&fonts::Font8);
+        numberGlyph.setTextSize(1);
+        const int16_t x = (numberGlyph.width() - numberGlyph.textWidth(String(i))) / 2;
+        const int16_t y = (numberGlyph.height() - numberGlyph.fontHeight()) / 2 + 5;
+        numberGlyph.setTextColor(TFT_WHITE);
+        numberGlyph.setCursor(x, y);
+        numberGlyph.print(i);
+        numberGlyph.setPivot(numberGlyph.width() / 2, numberGlyph.height() / 2);
+        const int numberX = _segmentPivotX + static_cast<int>(149.f * COS_18);
+        const int numberY = _segmentPivotY - static_cast<int>(149.f * SIN_18);
+        numberGlyph.pushRotateZoom(&segment, numberX, numberY,
+                                   63.f, 1.f, 1.f, TFT_TRANSPARENT);
     }
+}
+
+void RouletteDisplay::drawRoulette(int centerNumber, bool drawNeedle)
+{
+    const int16_t centerX = _display.width() / 2;
+    const int16_t centerY = _display.height() / 2;
+    _display.setColor(TFT_WHITE);
+    _display.fillEllipse(centerX, centerY, _circleRadius, _circleRadius);
+    const float rouletteAngle = _mode == Mode::Display ? _currentPos * 360.f / 4096.f : 0.f;
+    for (int i = 1; i <= 10; i++)
+    {
+        _segmentSprites[i - 1].pushRotateZoom(
+            &_display, centerX, centerY, rouletteAngle + 36.f * (i - 1),
+            1.f, 1.f, TFT_TRANSPARENT);
+    }
+    drawCenterNumber(centerNumber, centerX, centerY);
+    if (drawNeedle)
+    {
+        // const int needleTip = static_cast<int>(10 * scale);
+        // const int needleLength = static_cast<int>(60 * scale);
+        // _circleSprite.fillTriangle(size - needleTip, 0, size, needleTip,
+        //                            size - needleLength, needleLength, TFT_WHITE);
+        // _circleSprite.drawTriangle(size - needleTip, 0, size, needleTip,
+        //                            size - needleLength, needleLength, TFT_DARKGRAY);
+    }
+}
+
+void RouletteDisplay::setTargetNumber(int number) { _targetNumber = number; }
+void RouletteDisplay::setConnectionState(ConnectionState state) { _connectionState = state; }
+void RouletteDisplay::setCurrentPos(int pos) { _currentPos = pos; }
+void RouletteDisplay::setCurrentSpeed(int speed) { _currentSpeed = speed; }
+void RouletteDisplay::setCurrentNumber(int number) { _currentNumber = number; }
+
+Event RouletteDisplay::onTouched(int, int)
+{
+    return EvNone{};
+}
+
+Event RouletteDisplay::onTouchedCenterCircle()
+{
+    return EvNone{};
+}
+
+Event RouletteDisplay::onTouchedNumber(int)
+{
+    return EvNone{};
 }
 
 void RouletteDisplay::drawCenterNumber(int centerNumber, int16_t centerX, int16_t centerY)
@@ -167,25 +205,4 @@ void RouletteDisplay::drawCenterNumber(int centerNumber, int16_t centerX, int16_
     _display.setTextColor(TFT_WHITE);
     _display.setCursor(x, y);
     _display.print(centerNumber);
-}
-
-void RouletteDisplay::setTargetNumber(int number) { _targetNumber = number; }
-void RouletteDisplay::setConnectionState(ConnectionState state) { _connectionState = state; }
-void RouletteDisplay::setCurrentPos(int pos) { _currentPos = pos; }
-void RouletteDisplay::setCurrentSpeed(int speed) { _currentSpeed = speed; }
-void RouletteDisplay::setCurrentNumber(int number) { _currentNumber = number; }
-
-Event RouletteDisplay::onTouched(int, int)
-{
-    return EvNone{};
-}
-
-Event RouletteDisplay::onTouchedCenterCircle()
-{
-    return EvNone{};
-}
-
-Event RouletteDisplay::onTouchedNumber(int)
-{
-    return EvNone{};
 }
