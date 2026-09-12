@@ -51,7 +51,7 @@ static repeating_timer motorControlTimer;
 static constexpr float accelPwm100 = 1.00f;
 // モーターフリーのときの自然加速度（減速度）の絶対値
 // static constexpr float accelFreeAbs = 0.4f;
-static constexpr float accelFreeAbs = 0.25f;
+static constexpr float accelFreeAbs = 0.2f;
 // 速度がvのときの自然加速度（減速度）
 static constexpr float accelFree(float v)
 {
