@@ -53,6 +53,22 @@ static uint32_t numberColor(int number)
     return color_table[number - 1];
 }
 
+static int numberAtNeedle(int currentPos)
+{
+    constexpr float needleAngle = -45.f;
+    const float rouletteAngle = currentPos * 360.f / 4096.f;
+    float numberAngle = needleAngle - rouletteAngle;
+    while (numberAngle < 0.f)
+    {
+        numberAngle += 360.f;
+    }
+    while (numberAngle >= 360.f)
+    {
+        numberAngle -= 360.f;
+    }
+    return static_cast<int>(numberAngle / 36.f) + 1;
+}
+
 RouletteDisplay::RouletteDisplay(M5GFX &display)
     : _display(display),
       _segmentSprites{M5Canvas(&display), M5Canvas(&display), M5Canvas(&display),
@@ -107,7 +123,10 @@ void RouletteDisplay::update()
     _display.fillRect(_selectNumberMessageX, _selectNumberMessageY,
                       _selectNumberMessageSprite.width(),
                       _selectNumberMessageSprite.height(), TFT_BLACK);
-    drawRoulette(_mode == Mode::Display ? _currentNumber : _targetNumber,
+    const int centerNumber = _mode == Mode::Display
+                                 ? numberAtNeedle(_currentPos)
+                                 : _targetNumber;
+    drawRoulette(centerNumber,
                  _mode == Mode::Display);
     if (_toggleOn)
     {
