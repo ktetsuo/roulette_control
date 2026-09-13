@@ -26,9 +26,10 @@ static constexpr int _segmentPivotX = 0;
 static constexpr int _segmentPivotY = 0;
 static constexpr char _selectNumberMessage[] = "SELECT NUMBER";
 static constexpr int _selectNumberCharacterCount = sizeof(_selectNumberMessage) - 1;
-static constexpr float _selectNumberArcStart = -150.f * M_PI / 180.f;
-static constexpr float _selectNumberArcStep = 120.f * M_PI / 180.f /
-                                              (_selectNumberCharacterCount - 1);
+static constexpr float _selectNumberArcStep = 6.f * M_PI / 180.f;
+static constexpr float _selectNumberArcCenter = -90.f * M_PI / 180.f;
+static constexpr float _selectNumberArcStart =
+    _selectNumberArcCenter - _selectNumberArcStep * (_selectNumberCharacterCount - 1) / 2.f;
 static constexpr int _selectNumberRadius = _displayRadius - _textMargin;
 
 static uint32_t numberColor(int number)
