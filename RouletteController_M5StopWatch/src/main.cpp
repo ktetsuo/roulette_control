@@ -3,6 +3,29 @@
 #include "RouletteDisplay.h"
 
 static RouletteDisplay s_display(M5.Display);
+static volatile bool s_buttonAPressed = false;
+
+void intarvalTaskStep()
+{
+	// Aボタンが押されている場合、ルーレットの位置を更新する
+	if (s_buttonAPressed)
+	{
+		static int currentPos = 0;
+		currentPos = (currentPos + 16) % 4096;
+		s_display.setCurrentPos(currentPos);
+	}
+}
+
+void intervalTask(void *)
+{
+	constexpr TickType_t taskPeriod = pdMS_TO_TICKS(16);
+	TickType_t lastWakeTime = xTaskGetTickCount();
+	for (;;)
+	{
+		intarvalTaskStep();
+		vTaskDelayUntil(&lastWakeTime, taskPeriod); // 約60Hzの周期を維持
+	}
+}
 
 void setup()
 {
@@ -10,6 +33,8 @@ void setup()
 	cfg.serial_baudrate = 115200;
 	M5.begin(cfg);
 	s_display.init();
+	// 周期タスクを作成
+	xTaskCreate(intervalTask, "DisplayTask", 4096, nullptr, 1, nullptr);
 }
 
 void loop()
@@ -23,15 +48,8 @@ void loop()
 	Serial.println(dt);
 	// M5の更新
 	M5.update();
-	// Aボタンが押されている間回転する
-	static int currentPos = 0;
-	if (M5.BtnA.isPressed())
-	{
-		currentPos = (currentPos + 16) % 4096;
-		s_display.setCurrentPos(currentPos);
-		Serial.print("Current position: ");
-		Serial.println(currentPos);
-	}
+	// Aボタン
+	s_buttonAPressed = M5.BtnA.isPressed();
 	// Bボタンが押されたら数字をカウントアップする
 	static int currentNumber = 1;
 	if (M5.BtnB.wasPressed())
