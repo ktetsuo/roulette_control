@@ -33,6 +33,8 @@ private:
     M5GFX &_display;
     M5Canvas _segmentSprites[5];
     M5Canvas _selectNumberMessageSprite;
+    int _selectNumberMessageX = 0;
+    int _selectNumberMessageY = 0;
     int _targetNumber = 1;
     int _currentNumber = 1;
     int _currentPos = 0;
