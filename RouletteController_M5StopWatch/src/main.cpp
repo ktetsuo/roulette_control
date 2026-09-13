@@ -5,15 +5,36 @@
 static RouletteDisplay s_display(M5.Display);
 static volatile bool s_buttonAPressed = false;
 
+static constexpr int positionCountPerRevolution = 4096;
+static constexpr int maximumSpeed = 136; // 136カウント/周期で約2回転/秒
+static constexpr int acceleration = 8;
+static constexpr int deceleration = 1;
+
 void intarvalTaskStep()
 {
-	// Aボタンが押されている場合、ルーレットの位置を更新する
+	static int currentPos = 0;
+	static int currentSpeed = 0;
+
 	if (s_buttonAPressed)
 	{
-		static int currentPos = 0;
-		currentPos = (currentPos + 16) % 4096;
-		s_display.setCurrentPos(currentPos);
+		currentSpeed += acceleration;
+		if (currentSpeed > maximumSpeed)
+		{
+			currentSpeed = maximumSpeed;
+		}
 	}
+	else
+	{
+		currentSpeed -= deceleration;
+		if (currentSpeed < 0)
+		{
+			currentSpeed = 0;
+		}
+	}
+
+	currentPos = (currentPos + currentSpeed) % positionCountPerRevolution;
+	s_display.setCurrentPos(currentPos);
+	s_display.setCurrentSpeed(currentSpeed);
 }
 
 void intervalTask(void *)
