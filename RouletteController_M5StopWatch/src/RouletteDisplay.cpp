@@ -79,6 +79,13 @@ void RouletteDisplay::init()
 
 void RouletteDisplay::update()
 {
+    const unsigned long currentTime = millis();
+    if (currentTime - _lastToggleTime >= 1000)
+    {
+        _lastToggleTime = currentTime;
+        _toggleOn = !_toggleOn;
+    }
+
     _display.startWrite();
     _display.setFont(&fonts::Font0);
     _display.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -97,10 +104,16 @@ void RouletteDisplay::update()
         break;
     }
 
+    _display.fillRect(_selectNumberMessageX, _selectNumberMessageY,
+                      _selectNumberMessageSprite.width(),
+                      _selectNumberMessageSprite.height(), TFT_BLACK);
     drawRoulette(_mode == Mode::Display ? _currentNumber : _targetNumber,
                  _mode == Mode::Display);
-    _selectNumberMessageSprite.pushSprite(
-        &_display, _selectNumberMessageX, _selectNumberMessageY, TFT_TRANSPARENT);
+    if (_toggleOn)
+    {
+        _selectNumberMessageSprite.pushSprite(
+            &_display, _selectNumberMessageX, _selectNumberMessageY, TFT_TRANSPARENT);
+    }
 
     _display.endWrite();
 }
